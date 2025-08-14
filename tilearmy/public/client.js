@@ -71,7 +71,8 @@
       myId = msg.id; state = msg.state || state; pidEl.textContent = 'Player ' + myId; refreshVehicleTypes(); rebuildDashboard();
     } else if (msg.type === 'state') {
       state = msg.state || state;
-      const cur = (state.players[myId]?.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' + Math.floor(state.players[myId]?.resources||0) + '|' + Math.floor(state.players[myId]?.energy||0);
+      const p = state.players[myId] || {};
+      const cur = (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' + Math.floor(p.resources||0) + '|' + Math.floor(p.energy||0);
       if (rebuildDashboard._last !== cur) { rebuildDashboard._last = cur; rebuildDashboard(); }
     } else if (msg.type === 'notice') {
       showToast(msg.msg || (msg.ok?'OK':'Error'));
