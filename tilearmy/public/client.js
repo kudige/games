@@ -1,12 +1,13 @@
 // TileArmy — Client (Canvas)
 (async function(){
-  const res = await fetch('/cfg.json').then(r=>r.json()).catch(()=>({VIEW_W:1000,VIEW_H:700,BASE_ICON_SIZE:64,VEHICLE_ICON_SIZE:48,RESOURCE_ICON_SIZE:48}));
+  const res = await fetch('/cfg.json').then(r=>r.json()).catch(()=>({VIEW_W:1000,VIEW_H:700,BASE_ICON_SIZE:64,VEHICLE_ICON_SIZE:48,RESOURCE_ICON_SIZE:48,TILE_SIZE:32}));
   const sizes = [32,48,64];
   const nearest = val => sizes.reduce((a,b)=>Math.abs(b-val) < Math.abs(a-val) ? b : a);
   const cfg = { VIEW_W: res.VIEW_W, VIEW_H: res.VIEW_H };
   cfg.BASE_ICON_SIZE = nearest(Number(res.BASE_ICON_SIZE) || 32);
   cfg.VEHICLE_ICON_SIZE = nearest(Number(res.VEHICLE_ICON_SIZE) || 32);
   cfg.RESOURCE_ICON_SIZE = nearest(Number(res.RESOURCE_ICON_SIZE) || 32);
+  cfg.TILE_SIZE = Number(res.TILE_SIZE) || 32;
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -80,7 +81,7 @@
   const ws = new WebSocket((location.protocol === 'https:'? 'wss://' : 'ws://') + location.host);
 
   let myId = null;
-  let state = { players:{}, resources:[], cfg:{ MAP_W:2000, MAP_H:2000, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{} } };
+  let state = { players:{}, resources:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{} } };
   let selected = null; // vehicle id or 'base'
   const renderVehicles = {}; // smoothed positions
 
@@ -177,9 +178,10 @@
   let mousePx = 0, mousePy = 0;
   function updateCursorInfo(){
     if (!cursorInfo) return;
+    const tile = state.cfg.TILE_SIZE || 32;
     const w = toWorld(mousePx, mousePy);
-    const x = w.x.toFixed(1);
-    const y = w.y.toFixed(1);
+    const x = Math.floor(w.x / tile);
+    const y = Math.floor(w.y / tile);
     let text = `${x}, ${y}`;
     const me = state.players[myId];
     if (me){
@@ -191,8 +193,8 @@
         if (v){ ox = v.x; oy = v.y; }
       }
       if (ox !== undefined){
-        const d = Math.hypot(w.x - ox, w.y - oy);
-        text += ` | ${d.toFixed(1)}`;
+        const d = Math.hypot(w.x - ox, w.y - oy) / tile;
+        text += ` | ${Math.floor(d)}`;
       }
     }
     cursorInfo.textContent = text;
