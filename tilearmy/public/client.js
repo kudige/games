@@ -28,7 +28,7 @@
     ];
     const svgs = {};
     await Promise.all(ids.map(async id => {
-      svgs[id] = await fetch('/assets/' + id + '.svg').then(r=>r.text());
+      svgs[id] = await fetch('/assets/32/' + id + '.svg').then(r=>r.text());
     }));
     function makeImg(id, color){
       const txt = svgs[id];
