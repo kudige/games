@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>TileArmy — SVG Pack</title>
+<style>
+  :root{
+    /* Tweak these to recolor the whole set quickly */
+    --team:#22c55e;          /* primary/team tint */
+    --stroke:#0f172a;        /* outline */
+    --iron:#64748b;          /* iron ore */
+    --wood:#b45309;          /* lumber/wood */
+    --stone:#94a3b8;         /* stone */
+    --accent:#f59e0b;        /* small accents */
+    --glass:#cbd5e1;         /* windows */
+  }
+  body{font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; background:#0b1220; color:#e5e7eb; margin:0;}
+  header{padding:20px 24px; border-bottom:1px solid #1f2937;}
+  h1{font-size:18px;margin:0 0 6px}
+  p{margin:6px 0 0;color:#9ca3af}
+  .wrap{padding:20px 24px}
+  .grid{display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:16px}
+  .card{background:#0e1629; border:1px solid #1f2937; border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; align-items:center}
+  .card svg{width:64px;height:64px;}
+  .name{font-size:12px; color:#cbd5e1}
+  .row{display:flex; gap:10px; align-items:center}
+  .swatch{width:16px;height:16px;border-radius:4px;border:1px solid #1f2937}
+  .hint{font-size:12px;color:#94a3b8;margin-top:10px}
+
+  /* Generic strokes */
+  .stroke{stroke:var(--stroke); stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+  .fill-team{fill:var(--team)}
+  .fill-iron{fill:var(--iron)}
+  .fill-wood{fill:var(--wood)}
+  .fill-stone{fill:var(--stone)}
+  .fill-accent{fill:var(--accent)}
+  .fill-glass{fill:var(--glass)}
+  .no-fill{fill:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>TileArmy — SVG Unit & Building Pack</h1>
+  <p>Iron Mine, Lumber Mill, Stone Quarry, Home Base, and vehicles: Scout, Hauler, Hummer. 
+     <span class="hint">Tip: change <code>--team</code> to recolor units globally.</span></p>
+</header>
+
+<!-- Sprite Sheet: copy any <symbol> out as its own standalone <svg> if you prefer separate files. -->
+<svg width="0" height="0" style="position:absolute; left:-9999px; top:-9999px" aria-hidden="true">
+  <!-- IRON MINE -->
+  <symbol id="icon-iron-mine" viewBox="0 0 64 64">
+    <!-- rocky mound backdrop -->
+    <path class="stroke" fill="var(--iron)" fill-opacity=".8" d="M6 52 L18 28 L30 34 L38 22 L56 52 Z"/>
+    <path class="stroke" fill="var(--iron)" fill-opacity=".5" d="M10 52 L22 30 L28 34 L36 26 L50 52 Z"/>
+    <!-- timbered entrance -->
+    <rect class="stroke" x="24" y="34" width="16" height="14" fill="#0b1220"/>
+    <rect class="stroke" x="22" y="32" width="20" height="4" fill="var(--wood)"/>
+    <rect class="stroke" x="22" y="32" width="3" height="16" fill="var(--wood)"/>
+    <rect class="stroke" x="39" y="32" width="3" height="16" fill="var(--wood)"/>
+    <!-- rails -->
+    <path class="stroke" d="M20 52 L28 44"/>
+    <path class="stroke" d="M44 52 L36 44"/>
+    <g class="stroke">
+      <rect x="24" y="46.5" width="2.5" height="2" fill="#1f2937"/>
+      <rect x="28.5" y="44" width="2.5" height="2" fill="#1f2937"/>
+      <rect x="33" y="44" width="2.5" height="2" fill="#1f2937"/>
+      <rect x="37.5" y="46.5" width="2.5" height="2" fill="#1f2937"/>
+    </g>
+    <!-- ore cart at the mouth -->
+    <g transform="translate(30,42)">
+      <path class="stroke" d="M-6 0 H6 L4 6 H-4 Z" fill="#1f2937"/>
+      <rect class="stroke" x="-5" y="1" width="10" height="2" fill="var(--accent)"/>
+      <circle class="stroke" cx="-3" cy="7" r="2.2" fill="#111827"/>
+      <circle class="stroke" cx="3" cy="7" r="2.2" fill="#111827"/>
+      <!-- ore -->
+      <circle class="stroke fill-accent" cx="-2" cy="-1" r="1.6"/>
+      <circle class="stroke fill-accent" cx="1.5" cy="-0.5" r="1.4"/>
+    </g>
+    <!-- ground line -->
+    <path class="stroke" d="M6 52 H58"/>
+  </symbol>
+
+  <!-- LUMBER MILL -->
+  <symbol id="icon-lumber-mill" viewBox="0 0 64 64">
+    <!-- building body -->
+    <rect class="stroke fill-wood" x="10" y="28" width="30" height="22" rx="3"/>
+    <!-- roof -->
+    <path class="stroke fill-wood" d="M10 28 L25 18 L40 28 Z"/>
+    <!-- door & window -->
+    <rect class="stroke" x="16" y="38" width="8" height="12" rx="1.5" fill="#1f2937"/>
+    <rect class="stroke fill-glass" x="27" y="36" width="10" height="8" rx="1.5"/>
+    <!-- sawblade -->
+    <g transform="translate(46,40)">
+      <circle class="stroke" cx="0" cy="0" r="10" fill="#e5e7eb"/>
+      <!-- simple teeth -->
+      <g class="stroke" fill="#e5e7eb">
+        <path d="M0,-12 l2,3 l-4,0 z"/>
+        <path d="M8.5,-8.5 l3,2 l-3,2 z"/>
+        <path d="M12,0 l3,2 l-3,2 z" transform="rotate(90)"/>
+        <path d="M8.5,8.5 l3,2 l-3,2 z" transform="rotate(90)"/>
+        <path d="M0,12 l2,3 l-4,0 z"/>
+        <path d="M-8.5,8.5 l-3,2 l3,2 z"/>
+        <path d="M-12,0 l-3,2 l3,2 z" transform="rotate(90)"/>
+        <path d="M-8.5,-8.5 l-3,2 l3,2 z" transform="rotate(90)"/>
+      </g>
+      <circle class="stroke" cx="0" cy="0" r="2.5" fill="#cbd5e1"/>
+    </g>
+  </symbol>
+
+  <!-- STONE QUARRY -->
+  <symbol id="icon-stone-quarry" viewBox="0 0 64 64">
+    <!-- terraced pit -->
+    <ellipse class="stroke" cx="32" cy="42" rx="24" ry="12" fill="var(--stone)" fill-opacity=".35"/>
+    <ellipse class="stroke" cx="32" cy="42" rx="18" ry="9" fill="var(--stone)" fill-opacity=".55"/>
+    <ellipse class="stroke" cx="32" cy="42" rx="12" ry="6" fill="#e5e7eb"/>
+    <!-- access ramp -->
+    <path class="stroke" d="M15 40 C22 38, 26 38, 32 42" fill="none"/>
+    <!-- cut stone blocks -->
+    <g class="stroke" fill="#cbd5e1">
+      <rect x="10" y="46" width="10" height="6"/>
+      <rect x="22" y="48" width="8" height="5"/>
+      <rect x="45" y="46" width="9" height="6"/>
+    </g>
+    <!-- derrick crane lifting a block -->
+    <g class="stroke" transform="translate(44,18)">
+      <path d="M-8 26 L0 6 L8 26 Z" fill="none"/>
+      <line x1="0" y1="6" x2="0" y2="26"/>
+      <rect x="-3" y="26" width="6" height="4" fill="#cbd5e1"/>
+      <line x1="-8" y1="26" x2="8" y2="26"/>
+    </g>
+    <!-- debris -->
+    <circle class="stroke fill-stone" cx="18" cy="52" r="1.4"/>
+    <circle class="stroke fill-stone" cx="26" cy="53" r="1.2"/>
+    <circle class="stroke fill-stone" cx="50" cy="52" r="1.2"/>
+    <!-- edge line -->
+    <path class="stroke" d="M8 54 H56"/>
+  </symbol>
+
+  <!-- HOME BASE (hex pad + core) -->
+  <symbol id="icon-home-base" viewBox="0 0 64 64">
+    <!-- hex pad -->
+    <polygon class="stroke fill-team" points="32 8, 50 18, 50 38, 32 48, 14 38, 14 18"/>
+    <!-- inner ring -->
+    <circle class="stroke" cx="32" cy="28" r="10" fill="#0b1220"/>
+    <!-- core tower -->
+    <rect class="stroke fill-team" x="30" y="18" width="4" height="14" rx="1"/>
+    <path class="stroke fill-accent" d="M34 18 l8 -4 v8 z"/>
+  </symbol>
+
+  <!-- SCOUT (light buggy) -->
+  <symbol id="icon-vehicle-scout" viewBox="0 0 64 64">
+    <!-- body -->
+    <path class="stroke fill-team" d="M24 44 L32 18 L40 44 Z"/>
+    <!-- cockpit window -->
+    <polygon class="stroke fill-glass" points="32 22, 36 36, 28 36"/>
+    <!-- wheels -->
+    <circle class="stroke" cx="22" cy="46" r="4" fill="#111827"/>
+    <circle class="stroke" cx="42" cy="46" r="4" fill="#111827"/>
+    <!-- antenna -->
+    <path class="stroke" d="M32 18 L32 12"/>
+    <circle class="stroke fill-accent" cx="32" cy="11" r="1.8"/>
+  </symbol>
+
+  <!-- HAULER (cargo truck) -->
+  <symbol id="icon-vehicle-hauler" viewBox="0 0 64 64">
+    <!-- cargo bed -->
+    <rect class="stroke fill-team" x="12" y="28" width="28" height="18" rx="2"/>
+    <!-- cabin -->
+    <rect class="stroke fill-team" x="40" y="30" width="12" height="16" rx="2"/>
+    <rect class="stroke fill-glass" x="42" y="32" width="8" height="6" rx="1.2"/>
+    <!-- wheels (bigger rear) -->
+    <circle class="stroke" cx="20" cy="48" r="5" fill="#111827"/>
+    <circle class="stroke" cx="32" cy="48" r="5" fill="#111827"/>
+    <circle class="stroke" cx="46" cy="48" r="4.5" fill="#111827"/>
+  </symbol>
+
+  <!-- HUMMER (armored car) -->
+  <symbol id="icon-vehicle-hummer" viewBox="0 0 64 64">
+    <!-- hull -->
+    <rect class="stroke fill-team" x="16" y="28" width="32" height="16" rx="3"/>
+    <!-- roof turret / hatch -->
+    <rect class="stroke" x="28" y="24" width="8" height="6" rx="1.5" fill="#0b1220"/>
+    <path class="stroke" d="M32 24 v-4"/>
+    <path class="stroke" d="M32 20 h8"/>
+    <!-- windows -->
+    <rect class="stroke fill-glass" x="20" y="32" width="8" height="5" rx="1"/>
+    <rect class="stroke fill-glass" x="36" y="32" width="8" height="5" rx="1"/>
+    <!-- wheels -->
+    <circle class="stroke" cx="22" cy="48" r="5" fill="#111827"/>
+    <circle class="stroke" cx="42" cy="48" r="5" fill="#111827"/>
+  </symbol>
+</svg>
+
+<div class="wrap">
+  <div class="grid">
+    <div class="card">
+      <svg viewBox="0 0 64 64"><use href="#icon-iron-mine"/></svg>
+      <div class="name">Iron Mine</div>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 64 64"><use href="#icon-lumber-mill"/></svg>
+      <div class="name">Lumber Mill</div>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 64 64"><use href="#icon-stone-quarry"/></svg>
+      <div class="name">Stone Quarry</div>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 64 64"><use href="#icon-home-base"/></svg>
+      <div class="name">Home Base</div>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 64 64"><use href="#icon-vehicle-scout"/></svg>
+      <div class="name">Scout</div>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 64 64"><use href="#icon-vehicle-hauler"/></svg>
+      <div class="name">Hauler</div>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 64 64"><use href="#icon-vehicle-hummer"/></svg>
+      <div class="name">Hummer</div>
+    </div>
+  </div>
+
+  <div class="hint">Usage: include the sprite sheet part once, then draw any icon with
+    <code>&lt;svg viewBox="0 0 64 64" width="64" height="64"&gt;&lt;use href="#icon-home-base"/&gt;&lt;/svg&gt;</code>.
+    To recolor team units, set <code>--team</code> on a container: <code>style="--team:#60a5fa"</code>.
+  </div>
+
+  <div class="row hint" style="margin-top:12px">
+    <div class="swatch" style="background:var(--team)"></div>
+    <div>Current team color</div>
+  </div>
+</div>
+</body>
+</html>
