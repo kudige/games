@@ -23,10 +23,11 @@ const CFG = {
   HARVEST_RATE: 40,          // units/sec
   ENERGY_MAX: 100,           // player energy cap
   ENERGY_RECHARGE: 15,       // energy/sec auto recharge
+  BASE_VIEW: 300,            // how far the base can see
   VEHICLE_TYPES: {
-    scout:   { speed: 260, capacity: 120, energy: 0.015, hp: 60,  cost: 800 },
-    hauler:  { speed: 180, capacity: 400, energy: 0.03,  hp: 140, cost: 1500 },
-    basic:   { speed: 220, capacity: 200, energy: 0.02,  hp: 100, cost: 1000 },
+    scout:   { speed: 260, capacity: 120, energy: 0.015, hp: 60,  cost: 800, view: 300 },
+    hauler:  { speed: 180, capacity: 400, energy: 0.03,  hp: 140, cost: 1500, view: 220 },
+    basic:   { speed: 220, capacity: 200, energy: 0.02,  hp: 100, cost: 1000, view: 260 },
   },
 };
 
@@ -60,6 +61,7 @@ function snapshotState(){
       HARVEST_SEARCH_RADIUS: CFG.HARVEST_SEARCH_RADIUS,
       ENERGY_MAX: CFG.ENERGY_MAX,
       VEHICLE_TYPES: CFG.VEHICLE_TYPES,
+      BASE_VIEW: CFG.BASE_VIEW,
     },
     resources,
     players
@@ -69,7 +71,7 @@ function snapshotState(){
 wss.on('connection', (ws) => {
   seedResources();
   const id = newId(8);
-  const base = { x: rand(200, CFG.MAP_W-200), y: rand(200, CFG.MAP_H-200) };
+  const base = { x: rand(200, CFG.MAP_W-200), y: rand(200, CFG.MAP_H-200), view: CFG.BASE_VIEW };
   players[id] = {
     base,
     vehicles: [],
@@ -97,6 +99,7 @@ wss.on('connection', (ws) => {
           capacity: vt.capacity,
           energyCost: vt.energy,
           hp: vt.hp,
+          view: vt.view,
           x: me.base.x + 40,
           y: me.base.y,
           tx: me.base.x + 40,

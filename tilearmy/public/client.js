@@ -71,7 +71,7 @@
   const ws = new WebSocket((location.protocol === 'https:'? 'wss://' : 'ws://') + location.host);
 
   let myId = null;
-  let state = { players:{}, resources:[], cfg:{ MAP_W:2000, MAP_H:2000, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{} } };
+  let state = { players:{}, resources:[], cfg:{ MAP_W:2000, MAP_H:2000, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{}, BASE_VIEW:300 } };
   let selected = null; // vehicle id
   const renderVehicles = {}; // smoothed positions
 
@@ -200,7 +200,9 @@
     const sy = (e.clientY - r.top) * (canvas.height / r.height);
     const w = toWorld(sx, sy);
     const rr = state.cfg.RESOURCE_RADIUS || 22;
-    const res = state.resources.find(res => Math.hypot(res.x - w.x, res.y - w.y) <= rr);
+    const centers = getVisibilityCenters();
+    const visible = (x,y) => isVisible(x,y,centers);
+    const res = state.resources.find(res => Math.hypot(res.x - w.x, res.y - w.y) <= rr && visible(res.x, res.y));
     if (res) {
       ws.send(JSON.stringify({ type: 'harvestResource', vehicleId: selected, resourceId: res.id }));
     } else {
@@ -224,6 +226,23 @@
     for (const id in renderVehicles){ if (!seen.has(id)) delete renderVehicles[id]; }
   }
 
+  function getVisibilityCenters(){
+    const me = state.players[myId];
+    if (!me) return [];
+    const arr = [];
+    if (me.base) arr.push({ x: me.base.x, y: me.base.y, r: me.base.view || state.cfg.BASE_VIEW || 0 });
+    (me.vehicles || []).forEach(v => arr.push({ x: v.x, y: v.y, r: v.view || 0 }));
+    return arr;
+  }
+
+  function isVisible(x, y, centers){
+    for (const c of centers){
+      const dx = x - c.x, dy = y - c.y;
+      if (dx*dx + dy*dy <= c.r*c.r) return true;
+    }
+    return false;
+  }
+
   function drawGrid(){
     ctx.save();
     ctx.translate(-camera.x * camera.scale, -camera.y * camera.scale);
@@ -239,10 +258,11 @@
     ctx.restore();
   }
 
-  function drawResources(){
+  function drawResources(visible){
     ctx.save();
     for (const r of state.resources){
       if (r.amount <= 0) continue;
+      if (!visible(r.x, r.y)) continue;
       const img = images[r.type] || images.ore;
       const size = 32;
       const sx = (r.x - camera.x) * camera.scale;
@@ -254,7 +274,7 @@
     ctx.restore();
   }
 
-  function drawPlayers(){
+  function drawPlayers(visible){
     ctx.save();
     for (const pid in state.players){
       const p = state.players[pid]; if (!p) continue;
@@ -262,8 +282,11 @@
       const baseSize = 40;
       const bx = (p.base.x - camera.x) * camera.scale;
       const by = (p.base.y - camera.y) * camera.scale;
-      ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
+      if (pid === myId || visible(p.base.x, p.base.y)){
+        ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
+      }
       for (const v of p.vehicles){
+        if (pid !== myId && !visible(v.x, v.y)) continue;
         const img = tImgs[v.type] || tImgs.basic;
         const size = 24;
         const rv = renderVehicles[v.id] || v;
@@ -281,6 +304,21 @@
           ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(vx, vy, 16, 0, Math.PI*2); ctx.stroke();
         }
       }
+    }
+    ctx.restore();
+  }
+
+  function drawFog(centers){
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.globalCompositeOperation = 'destination-out';
+    for (const c of centers){
+      const vx = (c.x - camera.x) * camera.scale;
+      const vy = (c.y - camera.y) * camera.scale;
+      ctx.beginPath();
+      ctx.arc(vx, vy, c.r * camera.scale, 0, Math.PI*2);
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -305,9 +343,12 @@
     ctx.clearRect(0,0,canvas.width,canvas.height);
     updateCamera();
     smoothVehiclePositions();
+    const centers = getVisibilityCenters();
+    const visible = (x,y) => isVisible(x,y,centers);
     drawGrid();
-    drawResources();
-    drawPlayers();
+    drawResources(visible);
+    drawPlayers(visible);
+    drawFog(centers);
     requestAnimationFrame(draw);
   }
   draw();
