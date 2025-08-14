@@ -73,6 +73,7 @@
   let myId = null;
   let state = { players:{}, resources:[], cfg:{ MAP_W:2000, MAP_H:2000, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{} } };
   let selected = null; // vehicle id
+  const renderVehicles = {}; // smoothed positions
 
   // Camera
   const camera = { x: 0, y: 0, lerp: 0.15, follow: true, scale: 1 };
@@ -207,6 +208,22 @@
     }
   });
 
+  function smoothVehiclePositions(){
+    const seen = new Set();
+    const smooth = 0.25;
+    for (const pid in state.players){
+      const p = state.players[pid]; if (!p) continue;
+      for (const v of p.vehicles){
+        let rv = renderVehicles[v.id];
+        if (!rv){ rv = { x: v.x, y: v.y }; renderVehicles[v.id] = rv; }
+        rv.x += (v.x - rv.x) * smooth;
+        rv.y += (v.y - rv.y) * smooth;
+        seen.add(v.id);
+      }
+    }
+    for (const id in renderVehicles){ if (!seen.has(id)) delete renderVehicles[id]; }
+  }
+
   function drawGrid(){
     ctx.save();
     ctx.translate(-camera.x * camera.scale, -camera.y * camera.scale);
@@ -249,8 +266,9 @@
       for (const v of p.vehicles){
         const img = tImgs[v.type] || tImgs.basic;
         const size = 24;
-        const vx = (v.x - camera.x) * camera.scale;
-        const vy = (v.y - camera.y) * camera.scale;
+        const rv = renderVehicles[v.id] || v;
+        const vx = (rv.x - camera.x) * camera.scale;
+        const vy = (rv.y - camera.y) * camera.scale;
         ctx.drawImage(img, vx - size/2, vy - size/2, size, size);
         // carrying bar
         const frac = (v.carrying || 0) / (v.capacity || 200);
@@ -286,6 +304,7 @@
   function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
     updateCamera();
+    smoothVehiclePositions();
     drawGrid();
     drawResources();
     drawPlayers();
