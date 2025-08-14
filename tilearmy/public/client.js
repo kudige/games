@@ -7,10 +7,28 @@
   const ctx = canvas.getContext('2d');
   const vehiclesDiv = document.getElementById('vehicles');
   const pidEl = document.getElementById('pid');
-  const resEl = document.getElementById('resCount');
+  const oreEl = document.getElementById('oreCount');
+  const lumberEl = document.getElementById('lumberCount');
+  const stoneEl = document.getElementById('stoneCount');
   const energyFill = document.getElementById('energyFill');
   const toast = document.getElementById('toast');
   const vTypeSel = document.getElementById('vehicleType');
+
+  const images = {};
+  const imageFiles = {
+    base: 'img/base.svg',
+    scout: 'img/scout.svg',
+    hauler: 'img/hauler.svg',
+    basic: 'img/basic.svg',
+    ore: 'img/ore.svg',
+    lumber: 'img/lumber.svg',
+    stone: 'img/stone.svg'
+  };
+  for (const [k, src] of Object.entries(imageFiles)){
+    const img = new Image();
+    img.src = src;
+    images[k] = img;
+  }
 
   function showToast(text){ toast.textContent = text; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1500); }
 
@@ -42,7 +60,9 @@
     vehiclesDiv.innerHTML = '';
     const me = state.players[myId];
     if (!me) return;
-    resEl.textContent = Math.floor(me.resources||0);
+    oreEl.textContent = Math.floor(me.ore||0);
+    lumberEl.textContent = Math.floor(me.lumber||0);
+    stoneEl.textContent = Math.floor(me.stone||0);
     const energy = me.energy||0; const pct = (state.cfg.ENERGY_MAX? (energy/state.cfg.ENERGY_MAX):0)*100; energyFill.style.width = pct + '%';
     me.vehicles.forEach(v => {
       const b = document.createElement('button');
@@ -72,7 +92,7 @@
     } else if (msg.type === 'state') {
       state = msg.state || state;
       const p = state.players[myId] || {};
-      const cur = (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' + Math.floor(p.resources||0) + '|' + Math.floor(p.energy||0);
+      const cur = (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' + Math.floor(p.ore||0) + '|' + Math.floor(p.lumber||0) + '|' + Math.floor(p.stone||0) + '|' + Math.floor(p.energy||0);
       if (rebuildDashboard._last !== cur) { rebuildDashboard._last = cur; rebuildDashboard(); }
     } else if (msg.type === 'notice') {
       showToast(msg.msg || (msg.ok?'OK':'Error'));
@@ -135,10 +155,11 @@
     ctx.save(); ctx.translate(-camera.x, -camera.y);
     for (const r of state.resources){
       if (r.amount <= 0) continue;
-      const frac = r.amount / (state.cfg.RESOURCE_AMOUNT || 1);
-      const hue = 20 + (140-20)*frac; // 140 (green) -> 20 (red)
-      ctx.fillStyle = `hsl(${hue} 75% 60%)`;
-      ctx.beginPath(); ctx.arc(r.x, r.y, 10, 0, Math.PI*2); ctx.fill();
+      const img = images[r.type] || images.ore;
+      const size = 24;
+      ctx.globalAlpha = Math.max(0.3, r.amount / (state.cfg.RESOURCE_AMOUNT || 1));
+      ctx.drawImage(img, r.x - size/2, r.y - size/2, size, size);
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
   }
@@ -148,11 +169,14 @@
     for (const pid in state.players){
       const p = state.players[pid]; if (!p) continue;
       ctx.fillStyle = pid === myId ? '#ffc857' : p.color || '#ff6b6b';
-      ctx.fillRect(p.base.x-18, p.base.y-18, 36, 36);
+      ctx.beginPath(); ctx.arc(p.base.x, p.base.y, 20, 0, Math.PI*2); ctx.fill();
+      ctx.drawImage(images.base, p.base.x-20, p.base.y-20, 40, 40);
       for (const v of p.vehicles){
+        const img = images[v.type] || images.basic;
         ctx.beginPath();
         ctx.fillStyle = pid === myId ? '#9be9ff' : '#ffb3d1';
-        ctx.arc(v.x, v.y, 10, 0, Math.PI*2); ctx.fill();
+        ctx.arc(v.x, v.y, 12, 0, Math.PI*2); ctx.fill();
+        ctx.drawImage(img, v.x-12, v.y-12, 24, 24);
         // carrying bar
         const frac = (v.carrying || 0) / (v.capacity || 200);
         if (frac > 0){
@@ -161,7 +185,7 @@
           ctx.fillStyle = '#4ade80'; ctx.fillRect(v.x - W/2, v.y - 18, W*frac, H);
         }
         if (pid === myId && v.id === selected){
-          ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(v.x, v.y, 14, 0, Math.PI*2); ctx.stroke();
+          ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(v.x, v.y, 16, 0, Math.PI*2); ctx.stroke();
         }
       }
     }

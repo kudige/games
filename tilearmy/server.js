@@ -14,6 +14,7 @@ const CFG = {
   MAP_W: 4000,
   MAP_H: 3000,
   TICK_MS: 50,
+  RESOURCE_TYPES: ['ore', 'lumber', 'stone'],
   RESOURCE_COUNT: 60,
   RESOURCE_AMOUNT: 1000,     // per field
   RESOURCE_RADIUS: 22,
@@ -32,8 +33,8 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const players = Object.create(null); // { id: { base, vehicles, color, resources, energy } }
-const resources = []; // [{id,x,y,amount}]
+const players = Object.create(null); // { id: { base, vehicles, color, ore, lumber, stone, energy } }
+const resources = []; // [{id,type,x,y,amount}]
 let seeded = false;
 
 function rand(min, max){ return Math.random() * (max - min) + min; }
@@ -42,8 +43,10 @@ function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 
 function seedResources(){
   if (seeded) return;
-  for (let i=0;i<CFG.RESOURCE_COUNT;i++){
-    resources.push({ id: newId(6), x: rand(80, CFG.MAP_W-80), y: rand(80, CFG.MAP_H-80), amount: CFG.RESOURCE_AMOUNT });
+  for (const type of CFG.RESOURCE_TYPES){
+    for (let i=0;i<CFG.RESOURCE_COUNT;i++){
+      resources.push({ id: newId(6), type, x: rand(80, CFG.MAP_W-80), y: rand(80, CFG.MAP_H-80), amount: CFG.RESOURCE_AMOUNT });
+    }
   }
   seeded = true;
 }
@@ -53,6 +56,7 @@ function snapshotState(){
     cfg: {
       MAP_W: CFG.MAP_W, MAP_H: CFG.MAP_H,
       RESOURCE_AMOUNT: CFG.RESOURCE_AMOUNT,
+      RESOURCE_TYPES: CFG.RESOURCE_TYPES,
       ENERGY_MAX: CFG.ENERGY_MAX,
       VEHICLE_TYPES: CFG.VEHICLE_TYPES,
     },
@@ -69,7 +73,9 @@ wss.on('connection', (ws) => {
     base,
     vehicles: [],
     color: `hsl(${Math.floor(rand(0,360))} 70% 55%)`,
-    resources: 1500, // start with some
+    ore: 1500, // start with some ore
+    lumber: 0,
+    stone: 0,
     energy: CFG.ENERGY_MAX
   };
 
@@ -81,8 +87,8 @@ wss.on('connection', (ws) => {
 
     if (msg.type === 'spawnVehicle') {
       const vt = CFG.VEHICLE_TYPES[msg.vType] || CFG.VEHICLE_TYPES.basic;
-      if (me.resources >= vt.cost){
-        me.resources -= vt.cost;
+      if (me.ore >= vt.cost){
+        me.ore -= vt.cost;
         me.vehicles.push({
           id: newId(5),
           type: msg.vType || 'basic',
@@ -95,12 +101,13 @@ wss.on('connection', (ws) => {
           tx: me.base.x + 40,
           ty: me.base.y,
           carrying: 0,
+          carryType: null,
           state: 'idle', // idle | harvesting | returning
           targetRes: null
         });
         ws.send(JSON.stringify({ type: 'notice', ok: true, msg: `Vehicle spawned (-${vt.cost})` }));
       } else {
-        ws.send(JSON.stringify({ type: 'notice', ok: false, msg: 'Not enough resources to spawn vehicle' }));
+        ws.send(JSON.stringify({ type: 'notice', ok: false, msg: 'Not enough ore to spawn vehicle' }));
       }
     }
     else if (msg.type === 'moveVehicle') {
@@ -167,7 +174,10 @@ setInterval(() => {
         // Arrived at base when returning
         if (v.state === 'returning'){
           if (Math.hypot(v.x - pl.base.x, v.y - pl.base.y) < 30){
-            pl.resources += v.carrying; v.carrying = 0; v.state = 'idle'; v.targetRes = null;
+            if (v.carryType){
+              pl[v.carryType] = (pl[v.carryType] || 0) + v.carrying;
+            }
+            v.carrying = 0; v.carryType = null; v.state = 'idle'; v.targetRes = null;
           }
         }
       }
@@ -182,7 +192,7 @@ setInterval(() => {
           if (d <= CFG.RESOURCE_RADIUS){
             v.state = 'harvesting';
             const take = Math.min(harvestStep, v.capacity - v.carrying, r.amount);
-            if (take > 0){ v.carrying += take; r.amount -= take; }
+            if (take > 0){ v.carryType = v.carryType || r.type; v.carrying += take; r.amount -= take; }
             if (v.carrying >= v.capacity || r.amount <= 0){
               v.state = 'returning'; v.tx = pl.base.x; v.ty = pl.base.y; v.targetRes = null;
             }
