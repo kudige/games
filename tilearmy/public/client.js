@@ -313,6 +313,7 @@
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = '#000';
     for (const c of centers){
       const vx = (c.x - camera.x) * camera.scale;
       const vy = (c.y - camera.y) * camera.scale;
