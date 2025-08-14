@@ -15,23 +15,27 @@
   const toast = document.getElementById('toast');
   const vTypeSel = document.getElementById('vehicleType');
 
-  // Load SVG sprite sheet and prepare icon helpers
+  // Load individual SVG icons and prepare helpers
   async function loadIconSheet(){
-    const txt = await fetch('/assets/svg_assets.html').then(r=>r.text());
-    const doc = new DOMParser().parseFromString(txt, 'text/html');
-    const style = doc.querySelector('style').textContent;
-    const symbols = {};
-    doc.querySelectorAll('symbol').forEach(sym => symbols[sym.id] = sym);
-    function makeImg(symId, color){
-      const sym = symbols[symId];
-      if (!sym) return new Image();
-      const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-      svg.setAttribute('viewBox', sym.getAttribute('viewBox') || '0 0 64 64');
-      const styleEl = document.createElement('style');
-      styleEl.textContent = style;
-      svg.appendChild(styleEl);
-      for (const ch of sym.cloneNode(true).children){ svg.appendChild(ch); }
-      svg.setAttribute('xmlns','http://www.w3.org/2000/svg');
+    const ids = [
+      'icon-iron-mine',
+      'icon-lumber-mill',
+      'icon-stone-quarry',
+      'icon-home-base',
+      'icon-vehicle-scout',
+      'icon-vehicle-hauler',
+      'icon-vehicle-hummer'
+    ];
+    const svgs = {};
+    await Promise.all(ids.map(async id => {
+      svgs[id] = await fetch('/assets/' + id + '.svg').then(r=>r.text());
+    }));
+    function makeImg(id, color){
+      const txt = svgs[id];
+      if (!txt) return new Image();
+      const doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
+      const svg = doc.querySelector('svg');
+      if (!svg) return new Image();
       if (color) svg.style.setProperty('--team', color);
       const ser = new XMLSerializer().serializeToString(svg);
       const img = new Image();
