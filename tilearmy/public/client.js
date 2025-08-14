@@ -138,12 +138,36 @@
   function toWorld(px,py){
     return { x: px / camera.scale + camera.x, y: py / camera.scale + camera.y };
   }
+  function zoom(factor){
+    const prev = camera.scale;
+    camera.scale = Math.max(0.5, Math.min(3, camera.scale * factor));
+    const mx = camera.x + (canvas.width / prev)/2;
+    const my = camera.y + (canvas.height / prev)/2;
+    camera.x = mx - (canvas.width / camera.scale)/2;
+    camera.y = my - (canvas.height / camera.scale)/2;
+    camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+    camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
+  }
 
   window.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
-    if (['w','a','s','d'].includes(k)) {
-      keys[k] = true;
+    const map = { arrowup:'w', arrowdown:'s', arrowleft:'a', arrowright:'d' };
+    if (['w','a','s','d'].includes(k) || map[k]) {
+      keys[map[k] || k] = true;
       camera.follow = false;
+      e.preventDefault();
+    } else if (k === '+' || k === '=') {
+      zoom(1.2);
+      e.preventDefault();
+    } else if (k === '-') {
+      zoom(1/1.2);
+      e.preventDefault();
+    } else if (k === 'f') {
+      if (!document.fullscreenElement) {
+        canvas.requestFullscreen().catch(()=>{});
+      } else {
+        document.exitFullscreen().catch(()=>{});
+      }
       e.preventDefault();
     } else if (k === 'h') {
       const me = state.players[myId];
@@ -159,7 +183,9 @@
   });
   window.addEventListener('keyup', (e) => {
     const k = e.key.toLowerCase();
-    if (keys[k]) delete keys[k];
+    const map = { arrowup:'w', arrowdown:'s', arrowleft:'a', arrowright:'d' };
+    const mk = map[k] || k;
+    if (keys[mk]) delete keys[mk];
   });
 
   canvas.addEventListener('click', (e) => {
