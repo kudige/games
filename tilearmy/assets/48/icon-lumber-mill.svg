@@ -1,0 +1,45 @@
+<svg width="48" height="48" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    :root{
+      --team:#22c55e;
+      --stroke:#0f172a;
+      --iron:#64748b;
+      --wood:#b45309;
+      --stone:#94a3b8;
+      --accent:#f59e0b;
+      --glass:#cbd5e1;
+    }
+    .stroke{stroke:var(--stroke); stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+    .fill-team{fill:var(--team)}
+    .fill-iron{fill:var(--iron)}
+    .fill-wood{fill:var(--wood)}
+    .fill-stone{fill:var(--stone)}
+    .fill-accent{fill:var(--accent)}
+    .fill-glass{fill:var(--glass)}
+    .no-fill{fill:none}
+  </style>
+  <!-- building body -->
+  <rect class="stroke fill-wood" x="10" y="28" width="30" height="22" rx="3"/>
+  <!-- roof -->
+  <path class="stroke fill-wood" d="M10 28 L25 18 L40 28 Z"/>
+  <!-- door & window -->
+  <rect class="stroke" x="16" y="38" width="8" height="12" rx="1.5" fill="#1f2937"/>
+  <rect class="stroke fill-glass" x="27" y="36" width="10" height="8" rx="1.5"/>
+  <!-- sawblade -->
+  <g transform="translate(46,40)">
+    <circle class="stroke" cx="0" cy="0" r="10" fill="#e5e7eb"/>
+    <!-- simple teeth -->
+    <g class="stroke" fill="#e5e7eb">
+      <path d="M0,-12 l2,3 l-4,0 z"/>
+      <path d="M8.5,-8.5 l3,2 l-3,2 z"/>
+      <path d="M12,0 l3,2 l-3,2 z" transform="rotate(90)"/>
+      <path d="M8.5,8.5 l3,2 l-3,2 z" transform="rotate(90)"/>
+      <path d="M0,12 l2,3 l-4,0 z"/>
+      <path d="M-8.5,8.5 l-3,2 l3,2 z"/>
+      <path d="M-12,0 l-3,2 l3,2 z" transform="rotate(90)"/>
+      <path d="M-8.5,-8.5 l-3,2 l3,2 z" transform="rotate(90)"/>
+    </g>
+    <circle class="stroke" cx="0" cy="0" r="2.5" fill="#cbd5e1"/>
+  </g>
+</svg>
+

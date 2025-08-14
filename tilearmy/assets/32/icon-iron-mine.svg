@@ -1,0 +1,51 @@
+<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    :root{
+      --team:#22c55e;
+      --stroke:#0f172a;
+      --iron:#64748b;
+      --wood:#b45309;
+      --stone:#94a3b8;
+      --accent:#f59e0b;
+      --glass:#cbd5e1;
+    }
+    .stroke{stroke:var(--stroke); stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+    .fill-team{fill:var(--team)}
+    .fill-iron{fill:var(--iron)}
+    .fill-wood{fill:var(--wood)}
+    .fill-stone{fill:var(--stone)}
+    .fill-accent{fill:var(--accent)}
+    .fill-glass{fill:var(--glass)}
+    .no-fill{fill:none}
+  </style>
+  <!-- rocky mound backdrop -->
+  <path class="stroke" fill="var(--iron)" fill-opacity=".8" d="M6 52 L18 28 L30 34 L38 22 L56 52 Z"/>
+  <path class="stroke" fill="var(--iron)" fill-opacity=".5" d="M10 52 L22 30 L28 34 L36 26 L50 52 Z"/>
+  <!-- timbered entrance -->
+  <rect class="stroke" x="24" y="34" width="16" height="14" fill="#0b1220"/>
+  <rect class="stroke" x="22" y="32" width="20" height="4" fill="var(--wood)"/>
+  <rect class="stroke" x="22" y="32" width="3" height="16" fill="var(--wood)"/>
+  <rect class="stroke" x="39" y="32" width="3" height="16" fill="var(--wood)"/>
+  <!-- rails -->
+  <path class="stroke" d="M20 52 L28 44"/>
+  <path class="stroke" d="M44 52 L36 44"/>
+  <g class="stroke">
+    <rect x="24" y="46.5" width="2.5" height="2" fill="#1f2937"/>
+    <rect x="28.5" y="44" width="2.5" height="2" fill="#1f2937"/>
+    <rect x="33" y="44" width="2.5" height="2" fill="#1f2937"/>
+    <rect x="37.5" y="46.5" width="2.5" height="2" fill="#1f2937"/>
+  </g>
+  <!-- ore cart at the mouth -->
+  <g transform="translate(30,42)">
+    <path class="stroke" d="M-6 0 H6 L4 6 H-4 Z" fill="#1f2937"/>
+    <rect class="stroke" x="-5" y="1" width="10" height="2" fill="var(--accent)"/>
+    <circle class="stroke" cx="-3" cy="7" r="2.2" fill="#111827"/>
+    <circle class="stroke" cx="3" cy="7" r="2.2" fill="#111827"/>
+    <!-- ore -->
+    <circle class="stroke fill-accent" cx="-2" cy="-1" r="1.6"/>
+    <circle class="stroke fill-accent" cx="1.5" cy="-0.5" r="1.4"/>
+  </g>
+  <!-- ground line -->
+  <path class="stroke" d="M6 52 H58"/>
+</svg>
+
