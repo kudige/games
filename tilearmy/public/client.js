@@ -10,6 +10,15 @@
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
+  const mapWrap = document.getElementById('mapWrap');
+  const header = document.querySelector('header');
+  function resizeCanvas(){
+    canvas.width = mapWrap.clientWidth;
+    const h = window.innerHeight - header.offsetHeight - 40;
+    canvas.height = h > 0 ? h : 0;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
   ctx.imageSmoothingEnabled = false;
   const vehiclesDiv = document.getElementById('vehicles');
   const pidEl = document.getElementById('pid');
