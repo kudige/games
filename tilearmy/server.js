@@ -76,7 +76,7 @@ wss.on('connection', (ws) => {
     base,
     vehicles: [],
     color: `hsl(${Math.floor(rand(0,360))} 70% 55%)`,
-    ore: 1500, // start with some ore
+    ore: 800, // start with some ore
     lumber: 0,
     stone: 0,
     energy: CFG.ENERGY_MAX
@@ -126,6 +126,8 @@ wss.on('connection', (ws) => {
       const r = resources.find(r => r.id === msg.resourceId);
       if (v && r && r.amount > 0) {
         v.preferType = r.type;
+        v.carrying = 0;
+        v.carryType = null;
         v.targetRes = r.id;
         v.tx = r.x;
         v.ty = r.y;
@@ -166,17 +168,20 @@ setInterval(() => {
       if (v.state === 'idle' && v.carrying < v.capacity){
         if (!v.targetRes || !resources.find(r => r.id===v.targetRes && r.amount>0)){
           let best=null, bd=Infinity;
-          const consider = (type) => {
+          const consider = (type, radius) => {
             for (const r of resources){
               if (r.amount<=0 || claimed.has(r.id)) continue;
               if (type && r.type !== type) continue;
               const d=Math.hypot(r.x-v.x, r.y-v.y);
-              if (d>CFG.HARVEST_SEARCH_RADIUS) continue;
+              if (radius !== undefined && d>radius) continue;
               if (d<bd){bd=d; best=r;}
             }
           };
-          if (v.preferType) consider(v.preferType);
-          if (!best) consider(null);
+          if (v.preferType) {
+            consider(v.preferType); // search entire map for preferred type
+          } else {
+            consider(null, CFG.HARVEST_SEARCH_RADIUS);
+          }
           if (best){ v.targetRes = best.id; v.tx = best.x; v.ty = best.y; claimed.add(best.id); }
         }
       }
