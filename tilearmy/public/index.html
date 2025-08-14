@@ -28,7 +28,8 @@
   <header>
     <h1>TileArmy</h1>
     <div class="row">
-      <button id="spawn" class="primary">Spawn Vehicle (-1000)</button>
+      <select id="vehicleType"></select>
+      <button id="spawn" class="primary">Spawn Vehicle</button>
       <button id="toggleFollow">Follow: On</button>
       <span id="pid" class="pill"></span>
       <div id="stats" class="pill">Res: <span id="resCount">0</span></div>
@@ -41,7 +42,7 @@
       <h2>Your Vehicles</h2>
       <div id="vehicles"></div>
       <h2>Tips</h2>
-      <div>• Use WASD to move the camera. Press H to center on your base.<br>• Toggle camera follow to manually watch any spot.<br>• Resources change color as they deplete. Vehicles cost 1000.</div>
+      <div>• Use WASD to move the camera. Press H to center on your base.<br>• Toggle camera follow to manually watch any spot.<br>• Resources change color as they deplete. Different vehicles have different costs.</div>
     </aside>
   </div>
   <div id="toast"></div>

@@ -10,13 +10,14 @@
   const resEl = document.getElementById('resCount');
   const energyFill = document.getElementById('energyFill');
   const toast = document.getElementById('toast');
+  const vTypeSel = document.getElementById('vehicleType');
 
   function showToast(text){ toast.textContent = text; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1500); }
 
   const ws = new WebSocket((location.protocol === 'https:'? 'wss://' : 'ws://') + location.host);
 
   let myId = null;
-  let state = { players:{}, resources:[], cfg:{ MAP_W:2000, MAP_H:2000, VEHICLE_CAPACITY:200, RESOURCE_AMOUNT:1000, ENERGY_MAX:100 } };
+  let state = { players:{}, resources:[], cfg:{ MAP_W:2000, MAP_H:2000, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{} } };
   let selected = null; // vehicle id
 
   // Camera
@@ -45,7 +46,7 @@
     const energy = me.energy||0; const pct = (state.cfg.ENERGY_MAX? (energy/state.cfg.ENERGY_MAX):0)*100; energyFill.style.width = pct + '%';
     me.vehicles.forEach(v => {
       const b = document.createElement('button');
-      b.textContent = v.id + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
+      b.textContent = v.id + ' ' + (v.type||'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
       if (selected === null) selected = v.id; // auto-select first
       if (selected === v.id) b.classList.add('selected');
       b.onclick = () => { selected = v.id; rebuildDashboard(); };
@@ -53,10 +54,21 @@
     });
   }
 
+  function refreshVehicleTypes(){
+    if (!vTypeSel) return;
+    vTypeSel.innerHTML = '';
+    const types = state.cfg.VEHICLE_TYPES || {};
+    Object.keys(types).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t; opt.textContent = t + ` (-${types[t].cost})`;
+      vTypeSel.appendChild(opt);
+    });
+  }
+
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'init') {
-      myId = msg.id; state = msg.state || state; pidEl.textContent = 'Player ' + myId; rebuildDashboard();
+      myId = msg.id; state = msg.state || state; pidEl.textContent = 'Player ' + myId; refreshVehicleTypes(); rebuildDashboard();
     } else if (msg.type === 'state') {
       state = msg.state || state;
       const cur = (state.players[myId]?.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' + Math.floor(state.players[myId]?.resources||0) + '|' + Math.floor(state.players[myId]?.energy||0);
@@ -67,7 +79,8 @@
   };
 
   document.getElementById('spawn').onclick = () => {
-    ws.send(JSON.stringify({ type: 'spawnVehicle' }));
+    const vType = vTypeSel ? vTypeSel.value : undefined;
+    ws.send(JSON.stringify({ type: 'spawnVehicle', vType }));
   };
   function toWorld(px,py){ return { x: px + camera.x, y: py + camera.y }; }
 
@@ -140,7 +153,7 @@
         ctx.fillStyle = pid === myId ? '#9be9ff' : '#ffb3d1';
         ctx.arc(v.x, v.y, 10, 0, Math.PI*2); ctx.fill();
         // carrying bar
-        const frac = (v.carrying || 0) / (state.cfg.VEHICLE_CAPACITY || 200);
+        const frac = (v.carrying || 0) / (v.capacity || 200);
         if (frac > 0){
           const W = 26, H = 5;
           ctx.fillStyle = '#111'; ctx.fillRect(v.x - W/2, v.y - 18, W, H);

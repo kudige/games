@@ -14,16 +14,17 @@ const CFG = {
   MAP_W: 4000,
   MAP_H: 3000,
   TICK_MS: 50,
-  SPEED: 220,                // px/sec
   RESOURCE_COUNT: 60,
   RESOURCE_AMOUNT: 1000,     // per field
   RESOURCE_RADIUS: 22,
   HARVEST_RATE: 40,          // units/sec
-  VEHICLE_CAPACITY: 200,
-  VEHICLE_COST: 1000,        // cost to spawn a vehicle
   ENERGY_MAX: 100,           // player energy cap
   ENERGY_RECHARGE: 15,       // energy/sec auto recharge
-  ENERGY_MOVE_COST: 0.02     // energy per pixel moved (sum of all vehicles)
+  VEHICLE_TYPES: {
+    scout:   { speed: 260, capacity: 120, energy: 0.015, hp: 60,  cost: 800 },
+    hauler:  { speed: 180, capacity: 400, energy: 0.03,  hp: 140, cost: 1500 },
+    basic:   { speed: 220, capacity: 200, energy: 0.02,  hp: 100, cost: 1000 },
+  },
 };
 
 // ------------------ SERVER STATE ------------------
@@ -51,9 +52,9 @@ function snapshotState(){
   return {
     cfg: {
       MAP_W: CFG.MAP_W, MAP_H: CFG.MAP_H,
-      VEHICLE_CAPACITY: CFG.VEHICLE_CAPACITY,
       RESOURCE_AMOUNT: CFG.RESOURCE_AMOUNT,
-      ENERGY_MAX: CFG.ENERGY_MAX
+      ENERGY_MAX: CFG.ENERGY_MAX,
+      VEHICLE_TYPES: CFG.VEHICLE_TYPES,
     },
     resources,
     players
@@ -79,10 +80,16 @@ wss.on('connection', (ws) => {
     const me = players[id]; if (!me) return;
 
     if (msg.type === 'spawnVehicle') {
-      if (me.resources >= CFG.VEHICLE_COST){
-        me.resources -= CFG.VEHICLE_COST;
+      const vt = CFG.VEHICLE_TYPES[msg.vType] || CFG.VEHICLE_TYPES.basic;
+      if (me.resources >= vt.cost){
+        me.resources -= vt.cost;
         me.vehicles.push({
           id: newId(5),
+          type: msg.vType || 'basic',
+          speed: vt.speed,
+          capacity: vt.capacity,
+          energyCost: vt.energy,
+          hp: vt.hp,
           x: me.base.x + 40,
           y: me.base.y,
           tx: me.base.x + 40,
@@ -91,7 +98,7 @@ wss.on('connection', (ws) => {
           state: 'idle', // idle | harvesting | returning
           targetRes: null
         });
-        ws.send(JSON.stringify({ type: 'notice', ok: true, msg: `Vehicle spawned (-${CFG.VEHICLE_COST})` }));
+        ws.send(JSON.stringify({ type: 'notice', ok: true, msg: `Vehicle spawned (-${vt.cost})` }));
       } else {
         ws.send(JSON.stringify({ type: 'notice', ok: false, msg: 'Not enough resources to spawn vehicle' }));
       }
@@ -111,32 +118,51 @@ wss.on('connection', (ws) => {
 
 // ------------------ SIMULATION ------------------
 setInterval(() => {
-  const step = CFG.SPEED * (CFG.TICK_MS/1000);
   const harvestStep = CFG.HARVEST_RATE * (CFG.TICK_MS/1000);
   const rechargeStep = CFG.ENERGY_RECHARGE * (CFG.TICK_MS/1000);
 
+  // Track which resources are already claimed and avoid duplicates
+  const claimed = new Set();
+  for (const pid in players){
+    for (const v of players[pid].vehicles){
+      if (v.targetRes){
+        if (claimed.has(v.targetRes)){
+          v.state = 'idle';
+          v.targetRes = null;
+        } else {
+          claimed.add(v.targetRes);
+        }
+      }
+    }
+  }
+
   for (const pid in players){
     const pl = players[pid];
-    let movedPixelsThisTick = 0;
+    let energySpent = 0;
 
     for (const v of pl.vehicles){
-      // Auto-target nearest resource if idle and has capacity
-      if (v.state === 'idle' && v.carrying < CFG.VEHICLE_CAPACITY){
+      // Auto-target nearest unclaimed resource if idle and has capacity
+      if (v.state === 'idle' && v.carrying < v.capacity){
         if (!v.targetRes || !resources.find(r => r.id===v.targetRes && r.amount>0)){
           let best=null, bd=Infinity;
-          for (const r of resources){ if (r.amount<=0) continue; const d=Math.hypot(r.x-v.x, r.y-v.y); if (d<bd){bd=d; best=r;} }
-          if (best){ v.targetRes = best.id; v.tx = best.x; v.ty = best.y; }
+          for (const r of resources){
+            if (r.amount<=0 || claimed.has(r.id)) continue;
+            const d=Math.hypot(r.x-v.x, r.y-v.y);
+            if (d<bd){bd=d; best=r;}
+          }
+          if (best){ v.targetRes = best.id; v.tx = best.x; v.ty = best.y; claimed.add(best.id); }
         }
       }
 
       // Move
+      const step = v.speed * (CFG.TICK_MS/1000);
       const dx = (v.tx ?? v.x) - v.x, dy = (v.ty ?? v.y) - v.y;
       const dist = Math.hypot(dx, dy);
       if (dist > 0.5){
         const ux = dx/dist, uy = dy/dist;
         const mv = Math.min(step, dist);
         v.x += ux*mv; v.y += uy*mv;
-        movedPixelsThisTick += mv;
+        energySpent += mv * (v.energyCost || 0);
       } else {
         // Arrived at base when returning
         if (v.state === 'returning'){
@@ -147,7 +173,7 @@ setInterval(() => {
       }
 
       // Harvest
-      if (v.carrying >= CFG.VEHICLE_CAPACITY){
+      if (v.carrying >= v.capacity){
         v.state = 'returning'; v.tx = pl.base.x; v.ty = pl.base.y; v.targetRes = null;
       } else if (v.targetRes){
         const r = resources.find(r => r.id === v.targetRes);
@@ -155,9 +181,9 @@ setInterval(() => {
           const d = Math.hypot(r.x - v.x, r.y - v.y);
           if (d <= CFG.RESOURCE_RADIUS){
             v.state = 'harvesting';
-            const take = Math.min(harvestStep, CFG.VEHICLE_CAPACITY - v.carrying, r.amount);
+            const take = Math.min(harvestStep, v.capacity - v.carrying, r.amount);
             if (take > 0){ v.carrying += take; r.amount -= take; }
-            if (v.carrying >= CFG.VEHICLE_CAPACITY || r.amount <= 0){
+            if (v.carrying >= v.capacity || r.amount <= 0){
               v.state = 'returning'; v.tx = pl.base.x; v.ty = pl.base.y; v.targetRes = null;
             }
           }
@@ -168,8 +194,7 @@ setInterval(() => {
     }
 
     // Energy
-    const spent = movedPixelsThisTick * CFG.ENERGY_MOVE_COST;
-    pl.energy = clamp(pl.energy - spent + rechargeStep, 0, CFG.ENERGY_MAX);
+    pl.energy = clamp(pl.energy - energySpent + rechargeStep, 0, CFG.ENERGY_MAX);
   }
 
   // Broadcast snapshot
