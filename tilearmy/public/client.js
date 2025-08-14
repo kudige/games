@@ -5,6 +5,7 @@
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
   const vehiclesDiv = document.getElementById('vehicles');
   const pidEl = document.getElementById('pid');
   const oreEl = document.getElementById('oreCount');
@@ -70,7 +71,7 @@
   let selected = null; // vehicle id
 
   // Camera
-  const camera = { x: 0, y: 0, lerp: 0.15, follow: true };
+  const camera = { x: 0, y: 0, lerp: 0.15, follow: true, scale: 1 };
   const keys = {};
   document.getElementById('toggleFollow').onclick = () => {
     camera.follow = !camera.follow;
@@ -78,12 +79,12 @@
   };
 
   function focusOn(x,y){
-    const targetX = x - canvas.width/2;
-    const targetY = y - canvas.height/2;
+    const targetX = x - (canvas.width / camera.scale) / 2;
+    const targetY = y - (canvas.height / camera.scale) / 2;
     camera.x += (targetX - camera.x) * camera.lerp;
     camera.y += (targetY - camera.y) * camera.lerp;
-    camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width));
-    camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height));
+    camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+    camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
   }
 
   // Dashboard
@@ -134,7 +135,9 @@
     const vType = vTypeSel ? vTypeSel.value : undefined;
     ws.send(JSON.stringify({ type: 'spawnVehicle', vType }));
   };
-  function toWorld(px,py){ return { x: px + camera.x, y: py + camera.y }; }
+  function toWorld(px,py){
+    return { x: px / camera.scale + camera.x, y: py / camera.scale + camera.y };
+  }
 
   window.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
@@ -146,10 +149,10 @@
       const me = state.players[myId];
       if (me) {
         camera.follow = false;
-        camera.x = me.base.x - canvas.width/2;
-        camera.y = me.base.y - canvas.height/2;
-        camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width));
-        camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height));
+        camera.x = me.base.x - (canvas.width / camera.scale)/2;
+        camera.y = me.base.y - (canvas.height / camera.scale)/2;
+        camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+        camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
       }
       e.preventDefault();
     }
@@ -170,51 +173,58 @@
 
   function drawGrid(){
     ctx.save();
-    ctx.translate(-camera.x, -camera.y);
+    ctx.translate(-camera.x * camera.scale, -camera.y * camera.scale);
+    ctx.scale(camera.scale, camera.scale);
     ctx.globalAlpha = 0.18; ctx.strokeStyle = '#4b528b';
     const step = 100;
     const x0 = Math.floor(camera.x/step)*step;
-    const x1 = Math.min(state.cfg.MAP_W, camera.x + canvas.width + step);
+    const x1 = Math.min(state.cfg.MAP_W, camera.x + canvas.width / camera.scale + step);
     const y0 = Math.floor(camera.y/step)*step;
-    const y1 = Math.min(state.cfg.MAP_H, camera.y + canvas.height + step);
-    for (let x=x0; x<=x1; x+=step){ ctx.beginPath(); ctx.moveTo(x, camera.y); ctx.lineTo(x, camera.y + canvas.height); ctx.stroke(); }
-    for (let y=y0; y<=y1; y+=step){ ctx.beginPath(); ctx.moveTo(camera.x, y); ctx.lineTo(camera.x + canvas.width, y); ctx.stroke(); }
+    const y1 = Math.min(state.cfg.MAP_H, camera.y + canvas.height / camera.scale + step);
+    for (let x=x0; x<=x1; x+=step){ ctx.beginPath(); ctx.moveTo(x, camera.y); ctx.lineTo(x, camera.y + canvas.height / camera.scale); ctx.stroke(); }
+    for (let y=y0; y<=y1; y+=step){ ctx.beginPath(); ctx.moveTo(camera.x, y); ctx.lineTo(camera.x + canvas.width / camera.scale, y); ctx.stroke(); }
     ctx.restore();
   }
 
   function drawResources(){
-    ctx.save(); ctx.translate(-camera.x, -camera.y);
+    ctx.save();
     for (const r of state.resources){
       if (r.amount <= 0) continue;
       const img = images[r.type] || images.ore;
       const size = 32;
+      const sx = (r.x - camera.x) * camera.scale;
+      const sy = (r.y - camera.y) * camera.scale;
       ctx.globalAlpha = Math.max(0.3, r.amount / (state.cfg.RESOURCE_AMOUNT || 1));
-      ctx.drawImage(img, r.x - size/2, r.y - size/2, size, size);
+      ctx.drawImage(img, sx - size/2, sy - size/2, size, size);
       ctx.globalAlpha = 1;
     }
     ctx.restore();
   }
 
   function drawPlayers(){
-    ctx.save(); ctx.translate(-camera.x, -camera.y);
+    ctx.save();
     for (const pid in state.players){
       const p = state.players[pid]; if (!p) continue;
       const tImgs = getTeamIcons(pid, p.color || '#22c55e');
       const baseSize = 40;
-      ctx.drawImage(tImgs.base, p.base.x - baseSize/2, p.base.y - baseSize/2, baseSize, baseSize);
+      const bx = (p.base.x - camera.x) * camera.scale;
+      const by = (p.base.y - camera.y) * camera.scale;
+      ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
       for (const v of p.vehicles){
         const img = tImgs[v.type] || tImgs.basic;
         const size = 24;
-        ctx.drawImage(img, v.x - size/2, v.y - size/2, size, size);
+        const vx = (v.x - camera.x) * camera.scale;
+        const vy = (v.y - camera.y) * camera.scale;
+        ctx.drawImage(img, vx - size/2, vy - size/2, size, size);
         // carrying bar
         const frac = (v.carrying || 0) / (v.capacity || 200);
         if (frac > 0){
           const W = 26, H = 5;
-          ctx.fillStyle = '#111'; ctx.fillRect(v.x - W/2, v.y - 18, W, H);
-          ctx.fillStyle = '#4ade80'; ctx.fillRect(v.x - W/2, v.y - 18, W*frac, H);
+          ctx.fillStyle = '#111'; ctx.fillRect(vx - W/2, vy - 18, W, H);
+          ctx.fillStyle = '#4ade80'; ctx.fillRect(vx - W/2, vy - 18, W*frac, H);
         }
         if (pid === myId && v.id === selected){
-          ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(v.x, v.y, 16, 0, Math.PI*2); ctx.stroke();
+          ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(vx, vy, 16, 0, Math.PI*2); ctx.stroke();
         }
       }
     }
@@ -232,8 +242,8 @@
       if (keys['s']) camera.y += step;
       if (keys['a']) camera.x -= step;
       if (keys['d']) camera.x += step;
-      camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width));
-      camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height));
+      camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+      camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
     }
   }
 
