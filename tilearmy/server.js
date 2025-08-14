@@ -213,6 +213,8 @@ setInterval(() => {
 }, CFG.TICK_MS);
 
 // ------------------ STATIC + START ------------------
+// Serve SVG asset sheet for client-side icon rendering
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/cfg.json', (_req, res) => res.json({ VIEW_W: 1000, VIEW_H: 700 }));
 

@@ -14,20 +14,51 @@
   const toast = document.getElementById('toast');
   const vTypeSel = document.getElementById('vehicleType');
 
-  const images = {};
-  const imageFiles = {
-    base: 'img/base.svg',
-    scout: 'img/scout.svg',
-    hauler: 'img/hauler.svg',
-    basic: 'img/basic.svg',
-    ore: 'img/ore.svg',
-    lumber: 'img/lumber.svg',
-    stone: 'img/stone.svg'
+  // Load SVG sprite sheet and prepare icon helpers
+  async function loadIconSheet(){
+    const txt = await fetch('/assets/svg_assets.html').then(r=>r.text());
+    const doc = new DOMParser().parseFromString(txt, 'text/html');
+    const style = doc.querySelector('style').textContent;
+    const symbols = {};
+    doc.querySelectorAll('symbol').forEach(sym => symbols[sym.id] = sym);
+    function makeImg(symId, color){
+      const sym = symbols[symId];
+      if (!sym) return new Image();
+      const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('viewBox', sym.getAttribute('viewBox') || '0 0 64 64');
+      const styleEl = document.createElement('style');
+      styleEl.textContent = style;
+      svg.appendChild(styleEl);
+      for (const ch of sym.cloneNode(true).children){ svg.appendChild(ch); }
+      svg.setAttribute('xmlns','http://www.w3.org/2000/svg');
+      if (color) svg.style.setProperty('--team', color);
+      const ser = new XMLSerializer().serializeToString(svg);
+      const img = new Image();
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(ser)));
+      return img;
+    }
+    return { makeImg };
+  }
+
+  const iconSheet = await loadIconSheet();
+
+  const images = {
+    ore: iconSheet.makeImg('icon-iron-mine'),
+    lumber: iconSheet.makeImg('icon-lumber-mill'),
+    stone: iconSheet.makeImg('icon-stone-quarry')
   };
-  for (const [k, src] of Object.entries(imageFiles)){
-    const img = new Image();
-    img.src = src;
-    images[k] = img;
+
+  const teamIcons = {}; // cache per player
+  function getTeamIcons(pid, color){
+    if (!teamIcons[pid]){
+      teamIcons[pid] = {
+        base: iconSheet.makeImg('icon-home-base', color),
+        scout: iconSheet.makeImg('icon-vehicle-scout', color),
+        hauler: iconSheet.makeImg('icon-vehicle-hauler', color),
+        basic: iconSheet.makeImg('icon-vehicle-hummer', color),
+      };
+    }
+    return teamIcons[pid];
   }
 
   function showToast(text){ toast.textContent = text; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1500); }
@@ -156,7 +187,7 @@
     for (const r of state.resources){
       if (r.amount <= 0) continue;
       const img = images[r.type] || images.ore;
-      const size = 24;
+      const size = 32;
       ctx.globalAlpha = Math.max(0.3, r.amount / (state.cfg.RESOURCE_AMOUNT || 1));
       ctx.drawImage(img, r.x - size/2, r.y - size/2, size, size);
       ctx.globalAlpha = 1;
@@ -168,15 +199,13 @@
     ctx.save(); ctx.translate(-camera.x, -camera.y);
     for (const pid in state.players){
       const p = state.players[pid]; if (!p) continue;
-      ctx.fillStyle = pid === myId ? '#ffc857' : p.color || '#ff6b6b';
-      ctx.beginPath(); ctx.arc(p.base.x, p.base.y, 20, 0, Math.PI*2); ctx.fill();
-      ctx.drawImage(images.base, p.base.x-20, p.base.y-20, 40, 40);
+      const tImgs = getTeamIcons(pid, p.color || '#22c55e');
+      const baseSize = 40;
+      ctx.drawImage(tImgs.base, p.base.x - baseSize/2, p.base.y - baseSize/2, baseSize, baseSize);
       for (const v of p.vehicles){
-        const img = images[v.type] || images.basic;
-        ctx.beginPath();
-        ctx.fillStyle = pid === myId ? '#9be9ff' : '#ffb3d1';
-        ctx.arc(v.x, v.y, 12, 0, Math.PI*2); ctx.fill();
-        ctx.drawImage(img, v.x-12, v.y-12, 24, 24);
+        const img = tImgs[v.type] || tImgs.basic;
+        const size = 24;
+        ctx.drawImage(img, v.x - size/2, v.y - size/2, size, size);
         // carrying bar
         const frac = (v.carrying || 0) / (v.capacity || 200);
         if (frac > 0){
