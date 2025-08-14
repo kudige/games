@@ -1,6 +1,6 @@
 // TileArmy — Client (Canvas)
 (async function(){
-  const res = await fetch('/cfg.json').then(r=>r.json()).catch(()=>({VIEW_W:1000,VIEW_H:700,BASE_ICON_SIZE:32,VEHICLE_ICON_SIZE:32,RESOURCE_ICON_SIZE:32}));
+  const res = await fetch('/cfg.json').then(r=>r.json()).catch(()=>({VIEW_W:1000,VIEW_H:700,BASE_ICON_SIZE:64,VEHICLE_ICON_SIZE:48,RESOURCE_ICON_SIZE:48}));
   const sizes = [32,48,64];
   const nearest = val => sizes.reduce((a,b)=>Math.abs(b-val) < Math.abs(a-val) ? b : a);
   const cfg = { VIEW_W: res.VIEW_W, VIEW_H: res.VIEW_H };
