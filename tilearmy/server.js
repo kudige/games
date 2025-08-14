@@ -18,6 +18,7 @@ const CFG = {
   RESOURCE_COUNT: 60,
   RESOURCE_AMOUNT: 1000,     // per field
   RESOURCE_RADIUS: 22,
+  HARVEST_SEARCH_RADIUS: 300, // search radius for auto-harvest chaining
   HARVEST_RATE: 40,          // units/sec
   ENERGY_MAX: 100,           // player energy cap
   ENERGY_RECHARGE: 15,       // energy/sec auto recharge
@@ -57,6 +58,8 @@ function snapshotState(){
       MAP_W: CFG.MAP_W, MAP_H: CFG.MAP_H,
       RESOURCE_AMOUNT: CFG.RESOURCE_AMOUNT,
       RESOURCE_TYPES: CFG.RESOURCE_TYPES,
+      RESOURCE_RADIUS: CFG.RESOURCE_RADIUS,
+      HARVEST_SEARCH_RADIUS: CFG.HARVEST_SEARCH_RADIUS,
       ENERGY_MAX: CFG.ENERGY_MAX,
       VEHICLE_TYPES: CFG.VEHICLE_TYPES,
     },
@@ -118,6 +121,17 @@ wss.on('connection', (ws) => {
         v.ty = clamp(msg.y, 0, CFG.MAP_H);
       }
     }
+    else if (msg.type === 'harvestResource') {
+      const v = me.vehicles.find(v => v.id === msg.vehicleId);
+      const r = resources.find(r => r.id === msg.resourceId);
+      if (v && r && r.amount > 0) {
+        v.preferType = r.type;
+        v.targetRes = r.id;
+        v.tx = r.x;
+        v.ty = r.y;
+        v.state = 'idle';
+      }
+    }
   });
 
   ws.on('close', () => { delete players[id]; });
@@ -148,15 +162,21 @@ setInterval(() => {
     let energySpent = 0;
 
     for (const v of pl.vehicles){
-      // Auto-target nearest unclaimed resource if idle and has capacity
+      // Auto-target nearest unclaimed resource, prioritising preferred type
       if (v.state === 'idle' && v.carrying < v.capacity){
         if (!v.targetRes || !resources.find(r => r.id===v.targetRes && r.amount>0)){
           let best=null, bd=Infinity;
-          for (const r of resources){
-            if (r.amount<=0 || claimed.has(r.id)) continue;
-            const d=Math.hypot(r.x-v.x, r.y-v.y);
-            if (d<bd){bd=d; best=r;}
-          }
+          const consider = (type) => {
+            for (const r of resources){
+              if (r.amount<=0 || claimed.has(r.id)) continue;
+              if (type && r.type !== type) continue;
+              const d=Math.hypot(r.x-v.x, r.y-v.y);
+              if (d>CFG.HARVEST_SEARCH_RADIUS) continue;
+              if (d<bd){bd=d; best=r;}
+            }
+          };
+          if (v.preferType) consider(v.preferType);
+          if (!best) consider(null);
           if (best){ v.targetRes = best.id; v.tx = best.x; v.ty = best.y; claimed.add(best.id); }
         }
       }

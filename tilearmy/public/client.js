@@ -168,7 +168,13 @@
     const sx = (e.clientX - r.left) * (canvas.width / r.width);
     const sy = (e.clientY - r.top) * (canvas.height / r.height);
     const w = toWorld(sx, sy);
-    ws.send(JSON.stringify({ type: 'moveVehicle', vehicleId: selected, x: w.x, y: w.y }));
+    const rr = state.cfg.RESOURCE_RADIUS || 22;
+    const res = state.resources.find(res => Math.hypot(res.x - w.x, res.y - w.y) <= rr);
+    if (res) {
+      ws.send(JSON.stringify({ type: 'harvestResource', vehicleId: selected, resourceId: res.id }));
+    } else {
+      ws.send(JSON.stringify({ type: 'moveVehicle', vehicleId: selected, x: w.x, y: w.y }));
+    }
   });
 
   function drawGrid(){
