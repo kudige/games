@@ -76,7 +76,17 @@
   const renderVehicles = {}; // smoothed positions
 
   // Camera
-  const camera = { x: 0, y: 0, lerp: 0.15, follow: true, scale: 1 };
+  const camera = {
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    speed: 6000,
+    friction: 0.9,
+    lerp: 0.15,
+    follow: true,
+    scale: 1
+  };
   const keys = {};
   document.getElementById('toggleFollow').onclick = () => {
     camera.follow = !camera.follow;
@@ -285,30 +295,37 @@
     ctx.restore();
   }
 
-  function updateCamera(){
+  function updateCamera(dt){
     if (camera.follow){
+      camera.vx = 0; camera.vy = 0;
       const me = state.players[myId]; if (!me) return;
       const v = me.vehicles.find(v=>v.id===selected) || me.vehicles[0];
       if (v) focusOn(v.x, v.y);
     } else {
-      const step = 20;
-      if (keys['w']) camera.y -= step;
-      if (keys['s']) camera.y += step;
-      if (keys['a']) camera.x -= step;
-      if (keys['d']) camera.x += step;
+      const accel = camera.speed * dt;
+      if (keys['w']) camera.vy -= accel;
+      if (keys['s']) camera.vy += accel;
+      if (keys['a']) camera.vx -= accel;
+      if (keys['d']) camera.vx += accel;
+      camera.x += camera.vx * dt;
+      camera.y += camera.vy * dt;
+      camera.vx *= Math.pow(camera.friction, dt * 60);
+      camera.vy *= Math.pow(camera.friction, dt * 60);
       camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
       camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
     }
   }
 
-  function draw(){
+  let lastTime = performance.now();
+  function draw(now){
+    const dt = (now - lastTime) / 1000; lastTime = now;
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    updateCamera();
+    updateCamera(dt);
     smoothVehiclePositions();
     drawGrid();
     drawResources();
     drawPlayers();
     requestAnimationFrame(draw);
   }
-  draw();
+  requestAnimationFrame(draw);
 })();
