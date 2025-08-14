@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    :root{
+      --team:#22c55e;
+      --stroke:#0f172a;
+      --iron:#64748b;
+      --wood:#b45309;
+      --stone:#94a3b8;
+      --accent:#f59e0b;
+      --glass:#cbd5e1;
+    }
+    .stroke{stroke:var(--stroke); stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+    .fill-team{fill:var(--team)}
+    .fill-iron{fill:var(--iron)}
+    .fill-wood{fill:var(--wood)}
+    .fill-stone{fill:var(--stone)}
+    .fill-accent{fill:var(--accent)}
+    .fill-glass{fill:var(--glass)}
+    .no-fill{fill:none}
+  </style>
+  <!-- cargo bed -->
+  <rect class="stroke fill-team" x="12" y="28" width="28" height="18" rx="2"/>
+  <!-- cabin -->
+  <rect class="stroke fill-team" x="40" y="30" width="12" height="16" rx="2"/>
+  <rect class="stroke fill-glass" x="42" y="32" width="8" height="6" rx="1.2"/>
+  <!-- wheels (bigger rear) -->
+  <circle class="stroke" cx="20" cy="48" r="5" fill="#111827"/>
+  <circle class="stroke" cx="32" cy="48" r="5" fill="#111827"/>
+  <circle class="stroke" cx="46" cy="48" r="4.5" fill="#111827"/>
+</svg>
+

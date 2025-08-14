@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    :root{
+      --team:#22c55e;
+      --stroke:#0f172a;
+      --iron:#64748b;
+      --wood:#b45309;
+      --stone:#94a3b8;
+      --accent:#f59e0b;
+      --glass:#cbd5e1;
+    }
+    .stroke{stroke:var(--stroke); stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+    .fill-team{fill:var(--team)}
+    .fill-iron{fill:var(--iron)}
+    .fill-wood{fill:var(--wood)}
+    .fill-stone{fill:var(--stone)}
+    .fill-accent{fill:var(--accent)}
+    .fill-glass{fill:var(--glass)}
+    .no-fill{fill:none}
+  </style>
+  <!-- hex pad -->
+  <polygon class="stroke fill-team" points="32 8, 50 18, 50 38, 32 48, 14 38, 14 18"/>
+  <!-- inner ring -->
+  <circle class="stroke" cx="32" cy="28" r="10" fill="#0b1220"/>
+  <!-- core tower -->
+  <rect class="stroke fill-team" x="30" y="18" width="4" height="14" rx="1"/>
+  <path class="stroke fill-accent" d="M34 18 l8 -4 v8 z"/>
+</svg>
+

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    :root{
+      --team:#22c55e;
+      --stroke:#0f172a;
+      --iron:#64748b;
+      --wood:#b45309;
+      --stone:#94a3b8;
+      --accent:#f59e0b;
+      --glass:#cbd5e1;
+    }
+    .stroke{stroke:var(--stroke); stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+    .fill-team{fill:var(--team)}
+    .fill-iron{fill:var(--iron)}
+    .fill-wood{fill:var(--wood)}
+    .fill-stone{fill:var(--stone)}
+    .fill-accent{fill:var(--accent)}
+    .fill-glass{fill:var(--glass)}
+    .no-fill{fill:none}
+  </style>
+  <!-- body -->
+  <path class="stroke fill-team" d="M24 44 L32 18 L40 44 Z"/>
+  <!-- cockpit window -->
+  <polygon class="stroke fill-glass" points="32 22, 36 36, 28 36"/>
+  <!-- wheels -->
+  <circle class="stroke" cx="22" cy="46" r="4" fill="#111827"/>
+  <circle class="stroke" cx="42" cy="46" r="4" fill="#111827"/>
+  <!-- antenna -->
+  <path class="stroke" d="M32 18 L32 12"/>
+  <circle class="stroke fill-accent" cx="32" cy="11" r="1.8"/>
+</svg>
+
