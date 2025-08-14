@@ -21,6 +21,7 @@ TileArmy is a browser-based real-time resource-gathering game built with Node.js
 - **Automatic harvesting** – Idle vehicles automatically seek the nearest unclaimed resource. If you click a resource tile, the selected vehicle will harvest it and then automatically chain to nearby resources of the same type within a search radius before considering other resources. Once full, vehicles return to your base to unload.
 - **Manual commands** – Click on the map to move the selected vehicle. Use the dropdown to spawn different vehicle types.
 - **Energy** – Movement consumes energy. Your energy reserve slowly regenerates over time.
+- **Fog of war** – Only areas within range of your base and vehicles are visible. Explore the map to reveal resources and enemy units.
 - **Camera** – Toggle the "Follow" button to keep the view centered on your selected vehicle, or use WASD/arrow keys to pan manually. Use `+`/`-` to zoom, `F` to toggle fullscreen, and press `H` to jump back to your base.
 
 Happy harvesting!
