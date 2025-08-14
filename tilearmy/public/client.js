@@ -21,6 +21,7 @@
 
   // Camera
   const camera = { x: 0, y: 0, lerp: 0.15, follow: true };
+  const keys = {};
   document.getElementById('toggleFollow').onclick = () => {
     camera.follow = !camera.follow;
     document.getElementById('toggleFollow').textContent = 'Follow: ' + (camera.follow ? 'On' : 'Off');
@@ -68,8 +69,30 @@
   document.getElementById('spawn').onclick = () => {
     ws.send(JSON.stringify({ type: 'spawnVehicle' }));
   };
-
   function toWorld(px,py){ return { x: px + camera.x, y: py + camera.y }; }
+
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (['w','a','s','d'].includes(k)) {
+      keys[k] = true;
+      camera.follow = false;
+      e.preventDefault();
+    } else if (k === 'h') {
+      const me = state.players[myId];
+      if (me) {
+        camera.follow = false;
+        camera.x = me.base.x - canvas.width/2;
+        camera.y = me.base.y - canvas.height/2;
+        camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width));
+        camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height));
+      }
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    if (keys[k]) delete keys[k];
+  });
 
   canvas.addEventListener('click', (e) => {
     if (!selected) return;
@@ -132,10 +155,19 @@
   }
 
   function updateCamera(){
-    if (!camera.follow) return;
-    const me = state.players[myId]; if (!me) return;
-    const v = me.vehicles.find(v=>v.id===selected) || me.vehicles[0];
-    if (v) focusOn(v.x, v.y);
+    if (camera.follow){
+      const me = state.players[myId]; if (!me) return;
+      const v = me.vehicles.find(v=>v.id===selected) || me.vehicles[0];
+      if (v) focusOn(v.x, v.y);
+    } else {
+      const step = 20;
+      if (keys['w']) camera.y -= step;
+      if (keys['s']) camera.y += step;
+      if (keys['a']) camera.x -= step;
+      if (keys['d']) camera.x += step;
+      camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width));
+      camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height));
+    }
   }
 
   function draw(){
