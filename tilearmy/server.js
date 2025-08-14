@@ -19,6 +19,7 @@ const BASE_ICON_SIZE = nearestIconSize(parseInt(process.env.BASE_ICON_SIZE, 10) 
 const VEHICLE_ICON_SIZE = nearestIconSize(parseInt(process.env.VEHICLE_ICON_SIZE, 10) || 32);
 const RESOURCE_ICON_SIZE = nearestIconSize(parseInt(process.env.RESOURCE_ICON_SIZE, 10) || 32);
 const CFG = {
+  TILE_SIZE: parseInt(process.env.TILE_SIZE, 10) || 32,
   MAP_W: 4000,
   MAP_H: 3000,
   TICK_MS: 50,
@@ -51,7 +52,9 @@ function seedResources(){
   if (seeded) return;
   for (const type of CFG.RESOURCE_TYPES){
     for (let i=0;i<CFG.RESOURCE_COUNT;i++){
-      resources.push({ id: newId(6), type, x: rand(80, CFG.MAP_W-80), y: rand(80, CFG.MAP_H-80), amount: CFG.RESOURCE_AMOUNT });
+      const tx = Math.floor(rand(80, CFG.MAP_W - 80) / CFG.TILE_SIZE);
+      const ty = Math.floor(rand(80, CFG.MAP_H - 80) / CFG.TILE_SIZE);
+      resources.push({ id: newId(6), type, x: tx * CFG.TILE_SIZE, y: ty * CFG.TILE_SIZE, amount: CFG.RESOURCE_AMOUNT });
     }
   }
   seeded = true;
@@ -61,6 +64,7 @@ function snapshotState(){
   return {
     cfg: {
       MAP_W: CFG.MAP_W, MAP_H: CFG.MAP_H,
+      TILE_SIZE: CFG.TILE_SIZE,
       RESOURCE_AMOUNT: CFG.RESOURCE_AMOUNT,
       RESOURCE_TYPES: CFG.RESOURCE_TYPES,
       RESOURCE_RADIUS: CFG.RESOURCE_RADIUS,
@@ -79,7 +83,9 @@ function snapshotState(){
 wss.on('connection', (ws) => {
   seedResources();
   const id = newId(8);
-  const base = { x: rand(200, CFG.MAP_W-200), y: rand(200, CFG.MAP_H-200) };
+  const bx = Math.floor(rand(200, CFG.MAP_W - 200) / CFG.TILE_SIZE);
+  const by = Math.floor(rand(200, CFG.MAP_H - 200) / CFG.TILE_SIZE);
+  const base = { x: bx * CFG.TILE_SIZE, y: by * CFG.TILE_SIZE };
   players[id] = {
     base,
     vehicles: [],
@@ -107,9 +113,9 @@ wss.on('connection', (ws) => {
           capacity: vt.capacity,
           energyCost: vt.energy,
           hp: vt.hp,
-          x: me.base.x + 40,
+          x: me.base.x + CFG.TILE_SIZE,
           y: me.base.y,
-          tx: me.base.x + 40,
+          tx: me.base.x + CFG.TILE_SIZE,
           ty: me.base.y,
           carrying: 0,
           carryType: null,
@@ -249,7 +255,16 @@ setInterval(() => {
 // Serve SVG asset sheet for client-side icon rendering
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/cfg.json', (_req, res) => res.json({ VIEW_W: 1000, VIEW_H: 700, BASE_ICON_SIZE, VEHICLE_ICON_SIZE, RESOURCE_ICON_SIZE }));
+app.get('/cfg.json', (_req, res) =>
+  res.json({
+    VIEW_W: 1000,
+    VIEW_H: 700,
+    BASE_ICON_SIZE,
+    VEHICLE_ICON_SIZE,
+    RESOURCE_ICON_SIZE,
+    TILE_SIZE: CFG.TILE_SIZE,
+  })
+);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`TileArmy server running: http://localhost:${PORT}`));
