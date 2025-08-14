@@ -1,7 +1,12 @@
 // TileArmy — Client (Canvas)
 (async function(){
-  const res = await fetch('/cfg.json').then(r=>r.json()).catch(()=>({VIEW_W:1000,VIEW_H:700}));
+  const res = await fetch('/cfg.json').then(r=>r.json()).catch(()=>({VIEW_W:1000,VIEW_H:700,BASE_ICON_SIZE:32,VEHICLE_ICON_SIZE:32,RESOURCE_ICON_SIZE:32}));
+  const sizes = [32,48,64];
+  const nearest = val => sizes.reduce((a,b)=>Math.abs(b-val) < Math.abs(a-val) ? b : a);
   const cfg = { VIEW_W: res.VIEW_W, VIEW_H: res.VIEW_H };
+  cfg.BASE_ICON_SIZE = nearest(Number(res.BASE_ICON_SIZE) || 32);
+  cfg.VEHICLE_ICON_SIZE = nearest(Number(res.VEHICLE_ICON_SIZE) || 32);
+  cfg.RESOURCE_ICON_SIZE = nearest(Number(res.RESOURCE_ICON_SIZE) || 32);
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -16,7 +21,7 @@
   const vTypeSel = document.getElementById('vehicleType');
 
   // Load individual SVG icons and prepare helpers
-  async function loadIconSheet(){
+  async function loadIconSheet(size){
     const ids = [
       'icon-iron-mine',
       'icon-lumber-mill',
@@ -27,8 +32,9 @@
       'icon-vehicle-hummer'
     ];
     const svgs = {};
+    const dir = size === 64 ? '' : size + '/';
     await Promise.all(ids.map(async id => {
-      svgs[id] = await fetch('/assets/32/' + id + '.svg').then(r=>r.text());
+      svgs[id] = await fetch('/assets/' + dir + id + '.svg').then(r=>r.text());
     }));
     function makeImg(id, color){
       const txt = svgs[id];
@@ -45,22 +51,24 @@
     return { makeImg };
   }
 
-  const iconSheet = await loadIconSheet();
+  const baseSheet = await loadIconSheet(cfg.BASE_ICON_SIZE);
+  const vehicleSheet = await loadIconSheet(cfg.VEHICLE_ICON_SIZE);
+  const resourceSheet = await loadIconSheet(cfg.RESOURCE_ICON_SIZE);
 
   const images = {
-    ore: iconSheet.makeImg('icon-iron-mine'),
-    lumber: iconSheet.makeImg('icon-lumber-mill'),
-    stone: iconSheet.makeImg('icon-stone-quarry')
+    ore: resourceSheet.makeImg('icon-iron-mine'),
+    lumber: resourceSheet.makeImg('icon-lumber-mill'),
+    stone: resourceSheet.makeImg('icon-stone-quarry')
   };
 
   const teamIcons = {}; // cache per player
   function getTeamIcons(pid, color){
     if (!teamIcons[pid]){
       teamIcons[pid] = {
-        base: iconSheet.makeImg('icon-home-base', color),
-        scout: iconSheet.makeImg('icon-vehicle-scout', color),
-        hauler: iconSheet.makeImg('icon-vehicle-hauler', color),
-        basic: iconSheet.makeImg('icon-vehicle-hummer', color),
+        base: baseSheet.makeImg('icon-home-base', color),
+        scout: vehicleSheet.makeImg('icon-vehicle-scout', color),
+        hauler: vehicleSheet.makeImg('icon-vehicle-hauler', color),
+        basic: vehicleSheet.makeImg('icon-vehicle-hummer', color),
       };
     }
     return teamIcons[pid];
@@ -244,7 +252,7 @@
     for (const r of state.resources){
       if (r.amount <= 0) continue;
       const img = images[r.type] || images.ore;
-      const size = 32;
+      const size = cfg.RESOURCE_ICON_SIZE;
       const sx = (r.x - camera.x) * camera.scale;
       const sy = (r.y - camera.y) * camera.scale;
       ctx.globalAlpha = Math.max(0.3, r.amount / (state.cfg.RESOURCE_AMOUNT || 1));
@@ -259,13 +267,13 @@
     for (const pid in state.players){
       const p = state.players[pid]; if (!p) continue;
       const tImgs = getTeamIcons(pid, p.color || '#22c55e');
-      const baseSize = 40;
+      const baseSize = cfg.BASE_ICON_SIZE;
       const bx = (p.base.x - camera.x) * camera.scale;
       const by = (p.base.y - camera.y) * camera.scale;
       ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
       for (const v of p.vehicles){
         const img = tImgs[v.type] || tImgs.basic;
-        const size = 24;
+        const size = cfg.VEHICLE_ICON_SIZE;
         const rv = renderVehicles[v.id] || v;
         const vx = (rv.x - camera.x) * camera.scale;
         const vy = (rv.y - camera.y) * camera.scale;

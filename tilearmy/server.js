@@ -11,6 +11,13 @@ const path = require('path');
 const { rand, newId, clamp } = require('./utils');
 
 // ------------------ CONFIG ------------------
+const ICON_SIZES = [32, 48, 64];
+function nearestIconSize(val) {
+  return ICON_SIZES.reduce((a, b) => (Math.abs(b - val) < Math.abs(a - val) ? b : a));
+}
+const BASE_ICON_SIZE = nearestIconSize(parseInt(process.env.BASE_ICON_SIZE, 10) || 32);
+const VEHICLE_ICON_SIZE = nearestIconSize(parseInt(process.env.VEHICLE_ICON_SIZE, 10) || 32);
+const RESOURCE_ICON_SIZE = nearestIconSize(parseInt(process.env.RESOURCE_ICON_SIZE, 10) || 32);
 const CFG = {
   MAP_W: 4000,
   MAP_H: 3000,
@@ -60,6 +67,9 @@ function snapshotState(){
       HARVEST_SEARCH_RADIUS: CFG.HARVEST_SEARCH_RADIUS,
       ENERGY_MAX: CFG.ENERGY_MAX,
       VEHICLE_TYPES: CFG.VEHICLE_TYPES,
+      BASE_ICON_SIZE,
+      VEHICLE_ICON_SIZE,
+      RESOURCE_ICON_SIZE
     },
     resources,
     players
@@ -239,7 +249,7 @@ setInterval(() => {
 // Serve SVG asset sheet for client-side icon rendering
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/cfg.json', (_req, res) => res.json({ VIEW_W: 1000, VIEW_H: 700 }));
+app.get('/cfg.json', (_req, res) => res.json({ VIEW_W: 1000, VIEW_H: 700, BASE_ICON_SIZE, VEHICLE_ICON_SIZE, RESOURCE_ICON_SIZE }));
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`TileArmy server running: http://localhost:${PORT}`));
