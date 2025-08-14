@@ -8,6 +8,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const { rand, newId, clamp } = require('./utils');
 
 // ------------------ CONFIG ------------------
 const CFG = {
@@ -38,9 +39,6 @@ const players = Object.create(null); // { id: { base, vehicles, color, ore, lumb
 const resources = []; // [{id,type,x,y,amount}]
 let seeded = false;
 
-function rand(min, max){ return Math.random() * (max - min) + min; }
-function newId(len=9){ return Math.random().toString(36).slice(2, 2+len); }
-function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 
 function seedResources(){
   if (seeded) return;
