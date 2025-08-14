@@ -14,6 +14,7 @@
   const energyFill = document.getElementById('energyFill');
   const toast = document.getElementById('toast');
   const vTypeSel = document.getElementById('vehicleType');
+  const cursorInfo = document.getElementById('cursorInfo');
 
   // Load individual SVG icons and prepare helpers
   async function loadIconSheet(){
@@ -72,7 +73,7 @@
 
   let myId = null;
   let state = { players:{}, resources:[], cfg:{ MAP_W:2000, MAP_H:2000, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{} } };
-  let selected = null; // vehicle id
+  let selected = null; // vehicle id or 'base'
   const renderVehicles = {}; // smoothed positions
 
   // Camera
@@ -106,9 +107,10 @@
       b.textContent = v.id + ' ' + (v.type||'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
       if (selected === null) selected = v.id; // auto-select first
       if (selected === v.id) b.classList.add('selected');
-      b.onclick = () => { selected = v.id; rebuildDashboard(); };
+      b.onclick = () => { selected = v.id; rebuildDashboard(); updateCursorInfo(); };
       vehiclesDiv.appendChild(b);
     });
+    updateCursorInfo();
   }
 
   function refreshVehicleTypes(){
@@ -125,7 +127,18 @@
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'init') {
-      myId = msg.id; state = msg.state || state; pidEl.textContent = 'Player ' + myId; refreshVehicleTypes(); rebuildDashboard();
+      myId = msg.id; state = msg.state || state; pidEl.textContent = 'Player ' + myId;
+      const me = state.players[myId];
+      if (me) {
+        selected = 'base';
+        camera.x = me.base.x - (canvas.width / camera.scale)/2;
+        camera.y = me.base.y - (canvas.height / camera.scale)/2;
+        camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+        camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
+      }
+      refreshVehicleTypes();
+      rebuildDashboard();
+      updateCursorInfo();
     } else if (msg.type === 'state') {
       state = msg.state || state;
       const p = state.players[myId] || {};
@@ -142,6 +155,29 @@
   };
   function toWorld(px,py){
     return { x: px / camera.scale + camera.x, y: py / camera.scale + camera.y };
+  }
+  let mousePx = 0, mousePy = 0;
+  function updateCursorInfo(){
+    if (!cursorInfo) return;
+    const w = toWorld(mousePx, mousePy);
+    const x = w.x.toFixed(1);
+    const y = w.y.toFixed(1);
+    let text = `${x}, ${y}`;
+    const me = state.players[myId];
+    if (me){
+      let ox, oy;
+      if (selected === 'base'){
+        ox = me.base.x; oy = me.base.y;
+      } else {
+        const v = me.vehicles.find(v=>v.id===selected);
+        if (v){ ox = v.x; oy = v.y; }
+      }
+      if (ox !== undefined){
+        const d = Math.hypot(w.x - ox, w.y - oy);
+        text += ` | ${d.toFixed(1)}`;
+      }
+    }
+    cursorInfo.textContent = text;
   }
   function zoom(factor){
     const prev = camera.scale;
@@ -177,11 +213,14 @@
     } else if (k === 'h') {
       const me = state.players[myId];
       if (me) {
+        selected = 'base';
+        rebuildDashboard();
         camera.follow = false;
         camera.x = me.base.x - (canvas.width / camera.scale)/2;
         camera.y = me.base.y - (canvas.height / camera.scale)/2;
         camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
         camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
+        updateCursorInfo();
       }
       e.preventDefault();
     }
@@ -194,7 +233,7 @@
   });
 
   canvas.addEventListener('click', (e) => {
-    if (!selected) return;
+    if (!selected || selected === 'base') return;
     const r = canvas.getBoundingClientRect();
     const sx = (e.clientX - r.left) * (canvas.width / r.width);
     const sy = (e.clientY - r.top) * (canvas.height / r.height);
@@ -206,6 +245,13 @@
     } else {
       ws.send(JSON.stringify({ type: 'moveVehicle', vehicleId: selected, x: w.x, y: w.y }));
     }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    const r = canvas.getBoundingClientRect();
+    mousePx = (e.clientX - r.left) * (canvas.width / r.width);
+    mousePy = (e.clientY - r.top) * (canvas.height / r.height);
+    updateCursorInfo();
   });
 
   function smoothVehiclePositions(){
@@ -263,6 +309,9 @@
       const bx = (p.base.x - camera.x) * camera.scale;
       const by = (p.base.y - camera.y) * camera.scale;
       ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
+      if (pid === myId && selected === 'base'){
+        ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(bx, by, 22, 0, Math.PI*2); ctx.stroke();
+      }
       for (const v of p.vehicles){
         const img = tImgs[v.type] || tImgs.basic;
         const size = 24;
@@ -288,8 +337,12 @@
   function updateCamera(){
     if (camera.follow){
       const me = state.players[myId]; if (!me) return;
-      const v = me.vehicles.find(v=>v.id===selected) || me.vehicles[0];
-      if (v) focusOn(v.x, v.y);
+      if (selected === 'base'){
+        focusOn(me.base.x, me.base.y);
+      } else {
+        const v = me.vehicles.find(v=>v.id===selected) || me.vehicles[0];
+        if (v) focusOn(v.x, v.y);
+      }
     } else {
       const step = 20;
       if (keys['w']) camera.y -= step;
@@ -308,6 +361,7 @@
     drawGrid();
     drawResources();
     drawPlayers();
+    updateCursorInfo();
     requestAnimationFrame(draw);
   }
   draw();
