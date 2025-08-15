@@ -92,7 +92,8 @@
   let myId = null;
   let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:1000, VEHICLE_TYPES:{} } };
   let selected = null; // {type:'base'|'vehicle', id}
-  const renderVehicles = {}; // smoothed positions
+  const renderVehicles = {}; // smoothed positions and angles
+  const VEHICLE_OFFSETS = { scout: Math.PI/2 };
   const getBase = id => state.bases.find(b=>b.id===id);
 
   // Camera
@@ -312,9 +313,14 @@
       const p = state.players[pid]; if (!p) continue;
       for (const v of p.vehicles){
         let rv = renderVehicles[v.id];
-        if (!rv){ rv = { x: v.x, y: v.y }; renderVehicles[v.id] = rv; }
+        if (!rv){ rv = { x: v.x, y: v.y, lastX: v.x, lastY: v.y, angle: 0 }; renderVehicles[v.id] = rv; }
+        rv.lastX = rv.x;
+        rv.lastY = rv.y;
         rv.x += (v.x - rv.x) * smooth;
         rv.y += (v.y - rv.y) * smooth;
+        const dx = rv.x - rv.lastX;
+        const dy = rv.y - rv.lastY;
+        if (Math.hypot(dx, dy) > 0.001) rv.angle = Math.atan2(dy, dx);
         seen.add(v.id);
       }
     }
@@ -378,7 +384,16 @@
         const rv = renderVehicles[v.id] || v;
         const vx = (rv.x - camera.x) * camera.scale;
         const vy = (rv.y - camera.y) * camera.scale;
-        ctx.drawImage(img, vx - size/2, vy - size/2, size, size);
+        let ang = rv.angle || 0;
+        let flip = false;
+        if (ang > Math.PI/2 || ang < -Math.PI/2){ ang += Math.PI; flip = true; }
+        const offset = VEHICLE_OFFSETS[v.type] || 0;
+        ctx.save();
+        ctx.translate(vx, vy);
+        ctx.rotate(ang + offset);
+        if (flip) ctx.scale(-1,1);
+        ctx.drawImage(img, -size/2, -size/2, size, size);
+        ctx.restore();
         let frac = (v.carrying || 0) / (v.capacity || 200);
         if (v.state === 'unloading'){
           const total = state.cfg.UNLOAD_TIME || 1000;
