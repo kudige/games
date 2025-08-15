@@ -11,6 +11,7 @@
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
+  canvas.style.touchAction = 'none';
   const mapWrap = document.getElementById('mapWrap');
   const header = document.querySelector('header');
   function resizeCanvas(){
@@ -204,6 +205,7 @@
     return { x: px / camera.scale + camera.x, y: py / camera.scale + camera.y };
   }
   let mousePx = 0, mousePy = 0;
+  let dragging = false, dragPx = 0, dragPy = 0;
   function updateCursorInfo(){
     if (!cursorInfo) return;
     const tile = state.cfg.TILE_SIZE || 32;
@@ -305,12 +307,38 @@
     }
   });
 
-  canvas.addEventListener('mousemove', (e) => {
+  canvas.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    dragPx = e.clientX;
+    dragPy = e.clientY;
+    camera.follow = false;
+    if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
     const r = canvas.getBoundingClientRect();
     mousePx = (e.clientX - r.left) * (canvas.width / r.width);
     mousePy = (e.clientY - r.top) * (canvas.height / r.height);
+    if (dragging){
+      const dx = e.clientX - dragPx;
+      const dy = e.clientY - dragPy;
+      camera.x -= dx / camera.scale;
+      camera.y -= dy / camera.scale;
+      camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+      camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
+      dragPx = e.clientX;
+      dragPy = e.clientY;
+    }
     updateCursorInfo();
   });
+
+  function endDrag(e){
+    dragging = false;
+    if (canvas.releasePointerCapture && e.pointerId !== undefined) canvas.releasePointerCapture(e.pointerId);
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave', () => { dragging = false; });
 
   function spawnBullet(ax, ay, tx, ty){
     const speed = 800;
