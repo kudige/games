@@ -208,13 +208,7 @@ wss.on('connection', (ws) => {
 });
 
 // ------------------ SIMULATION ------------------
-setInterval(() => {
-  const dt = CFG.TICK_MS/1000;
-  const harvestStep = CFG.HARVEST_RATE * dt;
-  const rechargeStep = CFG.ENERGY_RECHARGE * dt;
-  const now = Date.now();
-
-  // Manufacturing queues
+function processManufacturing(now){
   for (const b of bases){
     if (!b.queue) b.queue = [];
     while (b.queue.length && b.queue[0].readyAt <= now){
@@ -244,6 +238,36 @@ setInterval(() => {
       });
     }
   }
+}
+
+function resolveCaptures(){
+  for (const b of bases){
+    if (b.hp <= 0 && b.lastAttacker){
+      const prev = b.owner;
+      const att = b.lastAttacker;
+      b.owner = att;
+      b.hp = CFG.BASE_HP;
+      b.damage = CFG.BASE_DAMAGE;
+      b.rof = CFG.BASE_ROF;
+      if (prev && players[prev]){
+        players[prev].bases = players[prev].bases.filter(id=>id!==b.id);
+      }
+      if (players[att]){
+        if (!players[att].bases.includes(b.id)) players[att].bases.push(b.id);
+      }
+      delete b.lastAttacker;
+    }
+  }
+}
+
+function gameLoop(){
+  const dt = CFG.TICK_MS/1000;
+  const harvestStep = CFG.HARVEST_RATE * dt;
+  const rechargeStep = CFG.ENERGY_RECHARGE * dt;
+  const now = Date.now();
+
+  // Manufacturing queues
+  processManufacturing(now);
 
   // Track claimed resources
   const claimed = new Set();
@@ -366,28 +390,16 @@ setInterval(() => {
   }
 
   // Capture bases
-  for (const b of bases){
-    if (b.hp <= 0 && b.lastAttacker){
-      const prev = b.owner;
-      const att = b.lastAttacker;
-      b.owner = att;
-      b.hp = CFG.BASE_HP;
-      b.damage = CFG.BASE_DAMAGE;
-      b.rof = CFG.BASE_ROF;
-      if (prev && players[prev]){
-        players[prev].bases = players[prev].bases.filter(id=>id!==b.id);
-      }
-      if (players[att]){
-        if (!players[att].bases.includes(b.id)) players[att].bases.push(b.id);
-      }
-      delete b.lastAttacker;
-    }
-  }
+  resolveCaptures();
 
   // Broadcast snapshot
   const snap = JSON.stringify({ type: 'state', state: snapshotState() });
   for (const client of wss.clients){ if (client.readyState === WebSocket.OPEN) client.send(snap); }
-}, CFG.TICK_MS);
+}
+
+if (process.env.NODE_ENV !== 'test'){
+  setInterval(gameLoop, CFG.TICK_MS);
+}
 
 // ------------------ STATIC + START ------------------
 // Serve SVG asset sheet for client-side icon rendering
@@ -404,5 +416,9 @@ app.get('/cfg.json', (_req, res) =>
   })
 );
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`TileArmy server running: http://localhost:${PORT}`));
+if (process.env.NODE_ENV !== 'test'){
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, () => console.log(`TileArmy server running: http://localhost:${PORT}`));
+}
+
+module.exports = { CFG, players, bases, processManufacturing, resolveCaptures };
