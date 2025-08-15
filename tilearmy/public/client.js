@@ -22,7 +22,9 @@
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
   ctx.imageSmoothingEnabled = false;
+  const basesDiv = document.getElementById('bases');
   const vehiclesDiv = document.getElementById('vehicles');
+  const bookmarksDiv = document.getElementById('bookmarks');
   const pidEl = document.getElementById('pid');
   const oreEl = document.getElementById('oreCount');
   const lumberEl = document.getElementById('lumberCount');
@@ -100,6 +102,7 @@
   const renderVehicles = {}; // smoothed positions and angles
   const bullets = [];
   const fireTimers = Object.create(null);
+  const bookmarks = [];
   const VEHICLE_OFFSETS = { scout: Math.PI/2 };
   const getBase = id => state.bases.find(b=>b.id===id);
 
@@ -121,31 +124,89 @@
     document.getElementById('toggleFollow').textContent = 'Follow: ' + (camera.follow ? 'On' : 'Off');
   };
 
-  function focusOn(x,y){
+  function focusOn(x,y,instant){
     const targetX = x - (canvas.width / camera.scale) / 2;
     const targetY = y - (canvas.height / camera.scale) / 2;
-    camera.x += (targetX - camera.x) * camera.lerp;
-    camera.y += (targetY - camera.y) * camera.lerp;
+    if (instant){
+      camera.x = targetX;
+      camera.y = targetY;
+    } else {
+      camera.x += (targetX - camera.x) * camera.lerp;
+      camera.y += (targetY - camera.y) * camera.lerp;
+    }
     camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
     camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
   }
 
   // Dashboard
   function rebuildDashboard() {
+    basesDiv.innerHTML = '';
     vehiclesDiv.innerHTML = '';
+    bookmarksDiv.innerHTML = '';
     const me = state.players[myId];
     if (!me) return;
     oreEl.textContent = Math.floor(me.ore||0);
     lumberEl.textContent = Math.floor(me.lumber||0);
     stoneEl.textContent = Math.floor(me.stone||0);
     const energy = me.energy||0; const pct = (state.cfg.ENERGY_MAX? (energy/state.cfg.ENERGY_MAX):0)*100; energyFill.style.width = pct + '%';
-    me.vehicles.forEach(v => {
-      const b = document.createElement('button');
-      b.textContent = v.id + ' ' + (v.type||'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
-      if (selected && selected.type==='vehicle' && selected.id === v.id) b.classList.add('selected');
-      b.onclick = () => { selected = {type:'vehicle', id:v.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
-      vehiclesDiv.appendChild(b);
+
+    const myBases = state.bases.filter(b=>b.owner===myId);
+    myBases.forEach(b => {
+      const btn = document.createElement('button');
+      btn.textContent = b.id;
+      if (selected && selected.type==='base' && selected.id === b.id) btn.classList.add('selected');
+      btn.onclick = () => { selected = {type:'base', id:b.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
+      basesDiv.appendChild(btn);
     });
+
+    me.vehicles.forEach(v => {
+      const btn = document.createElement('button');
+      btn.textContent = v.id + ' ' + (v.type||'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
+      if (selected && selected.type==='vehicle' && selected.id === v.id) btn.classList.add('selected');
+      btn.onclick = () => { selected = {type:'vehicle', id:v.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
+      vehiclesDiv.appendChild(btn);
+    });
+
+    const tile = state.cfg.TILE_SIZE || 32;
+    bookmarks.forEach(bm => {
+      const btn = document.createElement('button');
+      const x = Math.floor(bm.x / tile);
+      const y = Math.floor(bm.y / tile);
+      const span = document.createElement('span');
+      span.textContent = x + ',' + y;
+      btn.appendChild(span);
+
+      if (bm.entity){
+        let img;
+        if (bm.entity.type === 'base'){
+          const base = getBase(bm.entity.id);
+          const owner = base && base.owner ? state.players[base.owner] : null;
+          const tImgs = getTeamIcons(base ? base.owner || 'neutral' : 'neutral', owner ? owner.color : '#999');
+          img = tImgs.base;
+        } else if (bm.entity.type === 'vehicle'){
+          const p = state.players[bm.entity.pid];
+          const v = p ? p.vehicles.find(v=>v.id===bm.entity.id) : null;
+          const tImgs = getTeamIcons(bm.entity.pid, p ? p.color : '#22c55e');
+          img = v ? (tImgs[v.type] || tImgs.basic) : tImgs.basic;
+        } else if (bm.entity.type === 'resource'){
+          const res = state.resources.find(r=>r.id===bm.entity.id);
+          img = res ? images[res.type] : images[bm.entity.resType || 'ore'];
+        }
+        if (img){
+          const icon = img.cloneNode();
+          icon.className = 'bookmark-icon';
+          btn.prepend(icon);
+        }
+      }
+
+      btn.onclick = () => {
+        camera.follow = false;
+        camera.vx = 0; camera.vy = 0;
+        focusOn(bm.x, bm.y, true);
+      };
+      bookmarksDiv.appendChild(btn);
+    });
+
     updateCursorInfo();
     updateSpawnControls();
   }
@@ -188,7 +249,9 @@
     } else if (msg.type === 'state') {
       state = msg.state || state;
       const p = state.players[myId] || {};
-      const cur = (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' + Math.floor(p.ore||0) + '|' + Math.floor(p.lumber||0) + '|' + Math.floor(p.stone||0) + '|' + Math.floor(p.energy||0);
+      const cur = (p.bases || []).join(',') + '|' +
+        (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' +
+        Math.floor(p.ore||0) + '|' + Math.floor(p.lumber||0) + '|' + Math.floor(p.stone||0) + '|' + Math.floor(p.energy||0);
       if (rebuildDashboard._last !== cur) { rebuildDashboard._last = cur; rebuildDashboard(); }
       updateSpawnControls();
     } else if (msg.type === 'notice') {
@@ -289,6 +352,36 @@
     const sx = (e.clientX - r.left) * (canvas.width / r.width);
     const sy = (e.clientY - r.top) * (canvas.height / r.height);
     const w = toWorld(sx, sy);
+    if (e.shiftKey){
+      const bm = { x: w.x, y: w.y };
+      const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
+      if (baseHit){
+        bm.x = baseHit.x; bm.y = baseHit.y;
+        bm.entity = { type: 'base', id: baseHit.id };
+      } else {
+        let vHit = null, vPid = null;
+        for (const pid in state.players){
+          const p = state.players[pid]; if (!p) continue;
+          const vh = p.vehicles.find(v => Math.hypot(v.x - w.x, v.y - w.y) <= (cfg.VEHICLE_ICON_SIZE/2));
+          if (vh){ vHit = vh; vPid = pid; break; }
+        }
+        if (vHit){
+          bm.x = vHit.x; bm.y = vHit.y;
+          bm.entity = { type: 'vehicle', id: vHit.id, pid: vPid };
+        } else {
+          const rr = state.cfg.RESOURCE_RADIUS || 22;
+          const resHit = state.resources.find(r => Math.hypot(r.x - w.x, r.y - w.y) <= rr);
+          if (resHit){
+            bm.x = resHit.x; bm.y = resHit.y;
+            bm.entity = { type: 'resource', id: resHit.id, resType: resHit.type };
+          }
+        }
+      }
+      bookmarks.push(bm);
+      rebuildDashboard();
+      e.preventDefault();
+      return;
+    }
     const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
     if (baseHit){
       selected = {type:'base', id: baseHit.id};
