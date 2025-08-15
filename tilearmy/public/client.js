@@ -21,7 +21,9 @@
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
   ctx.imageSmoothingEnabled = false;
+  const basesDiv = document.getElementById('bases');
   const vehiclesDiv = document.getElementById('vehicles');
+  const bookmarksDiv = document.getElementById('bookmarks');
   const pidEl = document.getElementById('pid');
   const oreEl = document.getElementById('oreCount');
   const lumberEl = document.getElementById('lumberCount');
@@ -99,6 +101,7 @@
   const renderVehicles = {}; // smoothed positions and angles
   const bullets = [];
   const fireTimers = Object.create(null);
+  const bookmarks = [];
   const VEHICLE_OFFSETS = { scout: Math.PI/2 };
   const getBase = id => state.bases.find(b=>b.id===id);
 
@@ -131,20 +134,40 @@
 
   // Dashboard
   function rebuildDashboard() {
+    basesDiv.innerHTML = '';
     vehiclesDiv.innerHTML = '';
+    bookmarksDiv.innerHTML = '';
     const me = state.players[myId];
     if (!me) return;
     oreEl.textContent = Math.floor(me.ore||0);
     lumberEl.textContent = Math.floor(me.lumber||0);
     stoneEl.textContent = Math.floor(me.stone||0);
     const energy = me.energy||0; const pct = (state.cfg.ENERGY_MAX? (energy/state.cfg.ENERGY_MAX):0)*100; energyFill.style.width = pct + '%';
-    me.vehicles.forEach(v => {
-      const b = document.createElement('button');
-      b.textContent = v.id + ' ' + (v.type||'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
-      if (selected && selected.type==='vehicle' && selected.id === v.id) b.classList.add('selected');
-      b.onclick = () => { selected = {type:'vehicle', id:v.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
-      vehiclesDiv.appendChild(b);
+
+    const myBases = state.bases.filter(b=>b.owner===myId);
+    myBases.forEach(b => {
+      const btn = document.createElement('button');
+      btn.textContent = b.id;
+      if (selected && selected.type==='base' && selected.id === b.id) btn.classList.add('selected');
+      btn.onclick = () => { selected = {type:'base', id:b.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
+      basesDiv.appendChild(btn);
     });
+
+    me.vehicles.forEach(v => {
+      const btn = document.createElement('button');
+      btn.textContent = v.id + ' ' + (v.type||'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
+      if (selected && selected.type==='vehicle' && selected.id === v.id) btn.classList.add('selected');
+      btn.onclick = () => { selected = {type:'vehicle', id:v.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
+      vehiclesDiv.appendChild(btn);
+    });
+
+    bookmarks.forEach(bm => {
+      const btn = document.createElement('button');
+      btn.textContent = Math.floor(bm.x) + ',' + Math.floor(bm.y);
+      btn.onclick = () => { camera.follow = false; focusOn(bm.x, bm.y); };
+      bookmarksDiv.appendChild(btn);
+    });
+
     updateCursorInfo();
     updateSpawnControls();
   }
@@ -187,7 +210,9 @@
     } else if (msg.type === 'state') {
       state = msg.state || state;
       const p = state.players[myId] || {};
-      const cur = (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' + Math.floor(p.ore||0) + '|' + Math.floor(p.lumber||0) + '|' + Math.floor(p.stone||0) + '|' + Math.floor(p.energy||0);
+      const cur = (p.bases || []).join(',') + '|' +
+        (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' +
+        Math.floor(p.ore||0) + '|' + Math.floor(p.lumber||0) + '|' + Math.floor(p.stone||0) + '|' + Math.floor(p.energy||0);
       if (rebuildDashboard._last !== cur) { rebuildDashboard._last = cur; rebuildDashboard(); }
       updateSpawnControls();
     } else if (msg.type === 'notice') {
@@ -287,6 +312,12 @@
     const sx = (e.clientX - r.left) * (canvas.width / r.width);
     const sy = (e.clientY - r.top) * (canvas.height / r.height);
     const w = toWorld(sx, sy);
+    if (e.shiftKey){
+      bookmarks.push({ x: w.x, y: w.y });
+      rebuildDashboard();
+      e.preventDefault();
+      return;
+    }
     const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
     if (baseHit){
       selected = {type:'base', id: baseHit.id};
