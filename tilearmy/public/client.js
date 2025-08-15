@@ -40,7 +40,9 @@
       'icon-home-base',
       'icon-vehicle-scout',
       'icon-vehicle-hauler',
-      'icon-vehicle-hummer'
+      'icon-vehicle-hummer',
+      'icon-vehicle-light-tank',
+      'icon-vehicle-heavy-tank'
     ];
     const svgs = {};
     const dir = size === 64 ? '' : size + '/';
@@ -80,6 +82,8 @@
         scout: vehicleSheet.makeImg('icon-vehicle-scout', color),
         hauler: vehicleSheet.makeImg('icon-vehicle-hauler', color),
         basic: vehicleSheet.makeImg('icon-vehicle-hummer', color),
+        lightTank: vehicleSheet.makeImg('icon-vehicle-light-tank', color),
+        heavyTank: vehicleSheet.makeImg('icon-vehicle-heavy-tank', color),
       };
     }
     return teamIcons[pid];
