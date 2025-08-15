@@ -123,11 +123,16 @@
     document.getElementById('toggleFollow').textContent = 'Follow: ' + (camera.follow ? 'On' : 'Off');
   };
 
-  function focusOn(x,y){
+  function focusOn(x,y,instant){
     const targetX = x - (canvas.width / camera.scale) / 2;
     const targetY = y - (canvas.height / camera.scale) / 2;
-    camera.x += (targetX - camera.x) * camera.lerp;
-    camera.y += (targetY - camera.y) * camera.lerp;
+    if (instant){
+      camera.x = targetX;
+      camera.y = targetY;
+    } else {
+      camera.x += (targetX - camera.x) * camera.lerp;
+      camera.y += (targetY - camera.y) * camera.lerp;
+    }
     camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
     camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
   }
@@ -193,7 +198,11 @@
         }
       }
 
-      btn.onclick = () => { camera.follow = false; focusOn(bm.x, bm.y); };
+      btn.onclick = () => {
+        camera.follow = false;
+        camera.vx = 0; camera.vy = 0;
+        focusOn(bm.x, bm.y, true);
+      };
       bookmarksDiv.appendChild(btn);
     });
 
