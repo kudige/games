@@ -31,7 +31,7 @@ const CFG = {
   HARVEST_RATE: 40,          // units/sec
   ENERGY_MAX: 100,           // player energy cap
   ENERGY_RECHARGE: 15,       // energy/sec auto recharge
-  UNLOAD_TIME: 2000,         // ms to unload at base
+  UNLOAD_TIME: 1000,         // ms to unload at base
   BASE_ATTACK_RANGE: 150,
   NEUTRAL_BASE_COUNT: 5,
   BASE_HP: 200,
