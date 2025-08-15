@@ -161,9 +161,38 @@
       vehiclesDiv.appendChild(btn);
     });
 
+    const tile = state.cfg.TILE_SIZE || 32;
     bookmarks.forEach(bm => {
       const btn = document.createElement('button');
-      btn.textContent = Math.floor(bm.x) + ',' + Math.floor(bm.y);
+      const x = Math.floor(bm.x / tile);
+      const y = Math.floor(bm.y / tile);
+      const span = document.createElement('span');
+      span.textContent = x + ',' + y;
+      btn.appendChild(span);
+
+      if (bm.entity){
+        let img;
+        if (bm.entity.type === 'base'){
+          const base = getBase(bm.entity.id);
+          const owner = base && base.owner ? state.players[base.owner] : null;
+          const tImgs = getTeamIcons(base ? base.owner || 'neutral' : 'neutral', owner ? owner.color : '#999');
+          img = tImgs.base;
+        } else if (bm.entity.type === 'vehicle'){
+          const p = state.players[bm.entity.pid];
+          const v = p ? p.vehicles.find(v=>v.id===bm.entity.id) : null;
+          const tImgs = getTeamIcons(bm.entity.pid, p ? p.color : '#22c55e');
+          img = v ? (tImgs[v.type] || tImgs.basic) : tImgs.basic;
+        } else if (bm.entity.type === 'resource'){
+          const res = state.resources.find(r=>r.id===bm.entity.id);
+          img = res ? images[res.type] : images[bm.entity.resType || 'ore'];
+        }
+        if (img){
+          const icon = img.cloneNode();
+          icon.className = 'bookmark-icon';
+          btn.prepend(icon);
+        }
+      }
+
       btn.onclick = () => { camera.follow = false; focusOn(bm.x, bm.y); };
       bookmarksDiv.appendChild(btn);
     });
@@ -313,7 +342,31 @@
     const sy = (e.clientY - r.top) * (canvas.height / r.height);
     const w = toWorld(sx, sy);
     if (e.shiftKey){
-      bookmarks.push({ x: w.x, y: w.y });
+      const bm = { x: w.x, y: w.y };
+      const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
+      if (baseHit){
+        bm.x = baseHit.x; bm.y = baseHit.y;
+        bm.entity = { type: 'base', id: baseHit.id };
+      } else {
+        let vHit = null, vPid = null;
+        for (const pid in state.players){
+          const p = state.players[pid]; if (!p) continue;
+          const vh = p.vehicles.find(v => Math.hypot(v.x - w.x, v.y - w.y) <= (cfg.VEHICLE_ICON_SIZE/2));
+          if (vh){ vHit = vh; vPid = pid; break; }
+        }
+        if (vHit){
+          bm.x = vHit.x; bm.y = vHit.y;
+          bm.entity = { type: 'vehicle', id: vHit.id, pid: vPid };
+        } else {
+          const rr = state.cfg.RESOURCE_RADIUS || 22;
+          const resHit = state.resources.find(r => Math.hypot(r.x - w.x, r.y - w.y) <= rr);
+          if (resHit){
+            bm.x = resHit.x; bm.y = resHit.y;
+            bm.entity = { type: 'resource', id: resHit.id, resType: resHit.type };
+          }
+        }
+      }
+      bookmarks.push(bm);
       rebuildDashboard();
       e.preventDefault();
       return;
