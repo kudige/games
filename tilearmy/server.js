@@ -44,6 +44,8 @@ const CFG = {
     scout:   { speed: 260, capacity: 120, energy: 0.015, hp: 60,  damage: 6,  rof: 1,   build: 1, cost: 800 },
     hauler:  { speed: 180, capacity: 400, energy: 0.03,  hp: 140, damage: 12, rof: 0.8, build: 3, cost: 1500 },
     basic:   { speed: 220, capacity: 200, energy: 0.02,  hp: 100, damage: 8,  rof: 1,   build: 2, cost: 1000 },
+    lightTank: { speed: 200, capacity: 0,   energy: 0.04, hp: 180, damage: 20, rof: 1.2, build: 4, cost: 2000 },
+    heavyTank: { speed: 150, capacity: 0,   energy: 0.06, hp: 300, damage: 35, rof: 0.8, build: 6, cost: 3500 },
   },
 };
 
@@ -288,7 +290,7 @@ function gameLoop(){
 
     for (const v of pl.vehicles){
       // Auto-target resources
-      if (v.state === 'idle' && v.carrying < v.capacity){
+      if (v.capacity > 0 && v.state === 'idle' && v.carrying < v.capacity){
         if (!v.targetRes || !resources.find(r => r.id===v.targetRes && r.amount>0)){
           let best=null, bd=Infinity;
           const consider = (type, radius) => {
@@ -333,26 +335,28 @@ function gameLoop(){
       }
 
       // Harvest
-      if (v.carrying >= v.capacity){
-        if (v.state !== 'returning' && v.state !== 'unloading'){
-          const b = nearestBase(pl, v.x, v.y);
-          if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
-        }
-      } else if (v.targetRes){
-        const r = resources.find(r => r.id === v.targetRes);
-        if (r && r.amount > 0){
-          const d = Math.hypot(r.x - v.x, r.y - v.y);
-          if (d <= CFG.RESOURCE_RADIUS){
-            v.state = 'harvesting';
-            const take = Math.min(harvestStep, v.capacity - v.carrying, r.amount);
-            if (take > 0){ v.carryType = v.carryType || r.type; v.carrying += take; r.amount -= take; }
-            if (v.carrying >= v.capacity || r.amount <= 0){
-              const b = nearestBase(pl, v.x, v.y);
-              if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
-            }
+      if (v.capacity > 0){
+        if (v.carrying >= v.capacity){
+          if (v.state !== 'returning' && v.state !== 'unloading'){
+            const b = nearestBase(pl, v.x, v.y);
+            if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
           }
-        } else {
-          v.state = 'idle'; v.targetRes = null;
+        } else if (v.targetRes){
+          const r = resources.find(r => r.id === v.targetRes);
+          if (r && r.amount > 0){
+            const d = Math.hypot(r.x - v.x, r.y - v.y);
+            if (d <= CFG.RESOURCE_RADIUS){
+              v.state = 'harvesting';
+              const take = Math.min(harvestStep, v.capacity - v.carrying, r.amount);
+              if (take > 0){ v.carryType = v.carryType || r.type; v.carrying += take; r.amount -= take; }
+              if (v.carrying >= v.capacity || r.amount <= 0){
+                const b = nearestBase(pl, v.x, v.y);
+                if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
+              }
+            }
+          } else {
+            v.state = 'idle'; v.targetRes = null;
+          }
         }
       }
 

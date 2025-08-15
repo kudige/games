@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    :root{
+      --team:#22c55e;
+      --stroke:#0f172a;
+      --iron:#64748b;
+      --wood:#b45309;
+      --stone:#94a3b8;
+      --accent:#f59e0b;
+      --glass:#cbd5e1;
+    }
+    .stroke{stroke:var(--stroke); stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+    .fill-team{fill:var(--team)}
+    .fill-iron{fill:var(--iron)}
+    .fill-wood{fill:var(--wood)}
+    .fill-stone{fill:var(--stone)}
+    .fill-accent{fill:var(--accent)}
+    .fill-glass{fill:var(--glass)}
+    .no-fill{fill:none}
+  </style>
+  <!-- tracks -->
+  <rect class="stroke fill-iron" x="12" y="42" width="40" height="8" rx="2"/>
+  <!-- hull -->
+  <rect class="stroke fill-team" x="14" y="30" width="36" height="14" rx="2"/>
+  <!-- turret -->
+  <rect class="stroke fill-team" x="26" y="24" width="12" height="8" rx="2"/>
+  <!-- barrel -->
+  <path class="stroke" d="M38 28 H52"/>
+</svg>
