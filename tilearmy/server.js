@@ -57,6 +57,7 @@ const wss = new WebSocket.Server({ server });
 const players = Object.create(null); // { id: { bases, vehicles, color, ore, lumber, stone, energy } }
 const resources = []; // [{id,type,x,y,amount}]
 const bases = []; // [{id,x,y,owner,hp,damage,rof,queue}]
+const connections = Object.create(null); // playerId -> ws
 let seeded = false;
 let basesSeeded = false;
 
@@ -106,7 +107,10 @@ function snapshotState(){
       VEHICLE_TYPES: CFG.VEHICLE_TYPES,
       BASE_ICON_SIZE,
       VEHICLE_ICON_SIZE,
-      RESOURCE_ICON_SIZE
+      RESOURCE_ICON_SIZE,
+      BASE_HP: CFG.BASE_HP,
+      NEUTRAL_BASE_HP: CFG.NEUTRAL_BASE_HP,
+      BASE_ATTACK_RANGE: CFG.BASE_ATTACK_RANGE
     },
     resources,
     players,
@@ -151,6 +155,7 @@ wss.on('connection', (ws) => {
     stone: 0,
     energy: CFG.ENERGY_MAX
   };
+  connections[id] = ws;
 
   ws.send(JSON.stringify({ type: 'init', id, state: snapshotState() }));
 
@@ -208,6 +213,7 @@ wss.on('connection', (ws) => {
       }
     }
     delete players[id];
+    delete connections[id];
   });
 });
 
@@ -258,6 +264,10 @@ function resolveCaptures(){
       }
       if (players[att]){
         if (!players[att].bases.includes(b.id)) players[att].bases.push(b.id);
+        const ws = connections[att];
+        if (ws && ws.readyState === WebSocket.OPEN){
+          ws.send(JSON.stringify({ type: 'notice', ok: true, msg: `Congratulations, you have conquered base ${b.id}!` }));
+        }
       }
       delete b.lastAttacker;
     }
