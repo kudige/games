@@ -90,9 +90,10 @@
   const ws = new WebSocket((location.protocol === 'https:'? 'wss://' : 'ws://') + location.host);
 
   let myId = null;
-  let state = { players:{}, resources:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{} } };
-  let selected = null; // vehicle id or 'base'
+  let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{} } };
+  let selected = null; // {type:'base'|'vehicle', id}
   const renderVehicles = {}; // smoothed positions
+  const getBase = id => state.bases.find(b=>b.id===id);
 
   // Camera
   const camera = {
@@ -133,12 +134,20 @@
     me.vehicles.forEach(v => {
       const b = document.createElement('button');
       b.textContent = v.id + ' ' + (v.type||'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
-      if (selected === null) selected = v.id; // auto-select first
-      if (selected === v.id) b.classList.add('selected');
-      b.onclick = () => { selected = v.id; rebuildDashboard(); updateCursorInfo(); };
+      if (selected && selected.type==='vehicle' && selected.id === v.id) b.classList.add('selected');
+      b.onclick = () => { selected = {type:'vehicle', id:v.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
       vehiclesDiv.appendChild(b);
     });
     updateCursorInfo();
+    updateSpawnControls();
+  }
+
+  function updateSpawnControls(){
+    if (!vTypeSel || !document.getElementById('spawn')) return;
+    const base = selected && selected.type==='base' ? getBase(selected.id) : null;
+    const show = base && base.owner === myId;
+    vTypeSel.style.display = show ? '' : 'none';
+    document.getElementById('spawn').style.display = show ? '' : 'none';
   }
 
   function refreshVehicleTypes(){
@@ -156,30 +165,33 @@
     const msg = JSON.parse(e.data);
     if (msg.type === 'init') {
       myId = msg.id; state = msg.state || state; pidEl.textContent = 'Player ' + myId;
-      const me = state.players[myId];
-      if (me) {
-        selected = 'base';
-        camera.x = me.base.x - (canvas.width / camera.scale)/2;
-        camera.y = me.base.y - (canvas.height / camera.scale)/2;
+      const myBases = state.bases.filter(b=>b.owner===myId);
+      if (myBases.length){
+        selected = {type:'base', id: myBases[0].id};
+        camera.x = myBases[0].x - (canvas.width / camera.scale)/2;
+        camera.y = myBases[0].y - (canvas.height / camera.scale)/2;
         camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
         camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
       }
       refreshVehicleTypes();
       rebuildDashboard();
       updateCursorInfo();
+      updateSpawnControls();
     } else if (msg.type === 'state') {
       state = msg.state || state;
       const p = state.players[myId] || {};
       const cur = (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' + Math.floor(p.ore||0) + '|' + Math.floor(p.lumber||0) + '|' + Math.floor(p.stone||0) + '|' + Math.floor(p.energy||0);
       if (rebuildDashboard._last !== cur) { rebuildDashboard._last = cur; rebuildDashboard(); }
+      updateSpawnControls();
     } else if (msg.type === 'notice') {
       showToast(msg.msg || (msg.ok?'OK':'Error'));
     }
   };
 
   document.getElementById('spawn').onclick = () => {
+    if (!selected || selected.type !== 'base') return;
     const vType = vTypeSel ? vTypeSel.value : undefined;
-    ws.send(JSON.stringify({ type: 'spawnVehicle', vType }));
+    ws.send(JSON.stringify({ type: 'spawnVehicle', vType, baseId: selected.id }));
   };
   function toWorld(px,py){
     return { x: px / camera.scale + camera.x, y: py / camera.scale + camera.y };
@@ -195,10 +207,11 @@
     const me = state.players[myId];
     if (me){
       let ox, oy;
-      if (selected === 'base'){
-        ox = me.base.x; oy = me.base.y;
-      } else {
-        const v = me.vehicles.find(v=>v.id===selected);
+      if (selected && selected.type === 'base'){
+        const b = getBase(selected.id);
+        if (b){ ox = b.x; oy = b.y; }
+      } else if (selected && selected.type === 'vehicle') {
+        const v = me.vehicles.find(v=>v.id===selected.id);
         if (v){ ox = v.x; oy = v.y; }
       }
       if (ox !== undefined){
@@ -240,16 +253,17 @@
       }
       e.preventDefault();
     } else if (k === 'h') {
-      const me = state.players[myId];
-      if (me) {
-        selected = 'base';
+      const myBases = state.bases.filter(b=>b.owner===myId);
+      if (myBases.length){
+        selected = {type:'base', id: myBases[0].id};
         rebuildDashboard();
         camera.follow = false;
-        camera.x = me.base.x - (canvas.width / camera.scale)/2;
-        camera.y = me.base.y - (canvas.height / camera.scale)/2;
+        camera.x = myBases[0].x - (canvas.width / camera.scale)/2;
+        camera.y = myBases[0].y - (canvas.height / camera.scale)/2;
         camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
         camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
         updateCursorInfo();
+        updateSpawnControls();
       }
       e.preventDefault();
     }
@@ -262,17 +276,25 @@
   });
 
   canvas.addEventListener('click', (e) => {
-    if (!selected || selected === 'base') return;
     const r = canvas.getBoundingClientRect();
     const sx = (e.clientX - r.left) * (canvas.width / r.width);
     const sy = (e.clientY - r.top) * (canvas.height / r.height);
     const w = toWorld(sx, sy);
+    const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
+    if (baseHit){
+      selected = {type:'base', id: baseHit.id};
+      rebuildDashboard();
+      updateSpawnControls();
+      updateCursorInfo();
+      return;
+    }
+    if (!selected || selected.type !== 'vehicle') return;
     const rr = state.cfg.RESOURCE_RADIUS || 22;
     const res = state.resources.find(res => Math.hypot(res.x - w.x, res.y - w.y) <= rr);
     if (res) {
-      ws.send(JSON.stringify({ type: 'harvestResource', vehicleId: selected, resourceId: res.id }));
+      ws.send(JSON.stringify({ type: 'harvestResource', vehicleId: selected.id, resourceId: res.id }));
     } else {
-      ws.send(JSON.stringify({ type: 'moveVehicle', vehicleId: selected, x: w.x, y: w.y }));
+      ws.send(JSON.stringify({ type: 'moveVehicle', vehicleId: selected.id, x: w.x, y: w.y }));
     }
   });
 
@@ -329,18 +351,27 @@
     ctx.restore();
   }
 
-  function drawPlayers(){
+  function drawBases(){
+    ctx.save();
+    for (const b of state.bases){
+      const owner = b.owner ? state.players[b.owner] : null;
+      const tImgs = getTeamIcons(b.owner || 'neutral', owner ? owner.color : '#999');
+      const baseSize = cfg.BASE_ICON_SIZE;
+      const bx = (b.x - camera.x) * camera.scale;
+      const by = (b.y - camera.y) * camera.scale;
+      ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
+      if (selected && selected.type==='base' && selected.id === b.id){
+        ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(bx, by, 22, 0, Math.PI*2); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawVehicles(){
     ctx.save();
     for (const pid in state.players){
       const p = state.players[pid]; if (!p) continue;
       const tImgs = getTeamIcons(pid, p.color || '#22c55e');
-      const baseSize = cfg.BASE_ICON_SIZE;
-      const bx = (p.base.x - camera.x) * camera.scale;
-      const by = (p.base.y - camera.y) * camera.scale;
-      ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
-      if (pid === myId && selected === 'base'){
-        ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(bx, by, 22, 0, Math.PI*2); ctx.stroke();
-      }
       for (const v of p.vehicles){
         const img = tImgs[v.type] || tImgs.basic;
         const size = cfg.VEHICLE_ICON_SIZE;
@@ -348,14 +379,13 @@
         const vx = (rv.x - camera.x) * camera.scale;
         const vy = (rv.y - camera.y) * camera.scale;
         ctx.drawImage(img, vx - size/2, vy - size/2, size, size);
-        // carrying bar
         const frac = (v.carrying || 0) / (v.capacity || 200);
         if (frac > 0){
           const W = 26, H = 5;
           ctx.fillStyle = '#111'; ctx.fillRect(vx - W/2, vy - 18, W, H);
           ctx.fillStyle = '#4ade80'; ctx.fillRect(vx - W/2, vy - 18, W*frac, H);
         }
-        if (pid === myId && v.id === selected){
+        if (pid === myId && selected && selected.type==='vehicle' && v.id === selected.id){
           ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(vx, vy, 16, 0, Math.PI*2); ctx.stroke();
         }
       }
@@ -367,10 +397,12 @@
     if (camera.follow){
       camera.vx = 0; camera.vy = 0;
       const me = state.players[myId]; if (!me) return;
-      if (selected === 'base'){
-        focusOn(me.base.x, me.base.y);
+      if (selected && selected.type === 'base'){
+        const b = getBase(selected.id);
+        if (b) focusOn(b.x, b.y);
       } else {
-        const v = me.vehicles.find(v=>v.id===selected) || me.vehicles[0];
+        const vid = selected && selected.type==='vehicle' ? selected.id : null;
+        const v = me.vehicles.find(v=>v.id===vid) || me.vehicles[0];
         if (v) focusOn(v.x, v.y);
       }
     } else {
@@ -396,7 +428,8 @@
     smoothVehiclePositions();
     drawGrid();
     drawResources();
-    drawPlayers();
+    drawBases();
+    drawVehicles();
     updateCursorInfo();
     requestAnimationFrame(draw);
   }
