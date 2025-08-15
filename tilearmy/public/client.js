@@ -332,6 +332,43 @@
     updateCursorInfo();
   });
 
+  // Touch events for mobile devices
+  canvas.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    if (!t) return;
+    const r = canvas.getBoundingClientRect();
+    mousePx = (t.clientX - r.left) * (canvas.width / r.width);
+    mousePy = (t.clientY - r.top) * (canvas.height / r.height);
+    dragging = true;
+    dragPx = t.clientX;
+    dragPy = t.clientY;
+    camera.follow = false;
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    const t = e.touches[0];
+    if (!t) return;
+    const r = canvas.getBoundingClientRect();
+    mousePx = (t.clientX - r.left) * (canvas.width / r.width);
+    mousePy = (t.clientY - r.top) * (canvas.height / r.height);
+    if (dragging){
+      const dx = t.clientX - dragPx;
+      const dy = t.clientY - dragPy;
+      camera.x -= dx / camera.scale;
+      camera.y -= dy / camera.scale;
+      camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+      camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
+      dragPx = t.clientX;
+      dragPy = t.clientY;
+    }
+    updateCursorInfo();
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => { dragging = false; });
+  canvas.addEventListener('touchcancel', () => { dragging = false; });
+
   function endDrag(e){
     dragging = false;
     if (canvas.releasePointerCapture && e.pointerId !== undefined) canvas.releasePointerCapture(e.pointerId);
