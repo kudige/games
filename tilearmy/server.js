@@ -31,6 +31,7 @@ const CFG = {
   HARVEST_RATE: 40,          // units/sec
   ENERGY_MAX: 100,           // player energy cap
   ENERGY_RECHARGE: 15,       // energy/sec auto recharge
+  UNLOAD_TIME: 2000,         // ms to unload at base
   BASE_ATTACK_RANGE: 150,
   NEUTRAL_BASE_COUNT: 5,
   BASE_HP: 200,
@@ -99,6 +100,7 @@ function snapshotState(){
       RESOURCE_RADIUS: CFG.RESOURCE_RADIUS,
       HARVEST_SEARCH_RADIUS: CFG.HARVEST_SEARCH_RADIUS,
       ENERGY_MAX: CFG.ENERGY_MAX,
+      UNLOAD_TIME: CFG.UNLOAD_TIME,
       VEHICLE_TYPES: CFG.VEHICLE_TYPES,
       BASE_ICON_SIZE,
       VEHICLE_ICON_SIZE,
@@ -318,7 +320,7 @@ function gameLoop(){
           if (base && Math.hypot(v.x-base.x, v.y-base.y) < 30){
             if (v.state !== 'unloading'){
               v.state = 'unloading';
-              v.unloadTimer = 2000;
+              v.unloadTimer = CFG.UNLOAD_TIME;
             } else {
               v.unloadTimer -= CFG.TICK_MS;
               if (v.unloadTimer <= 0){

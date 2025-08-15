@@ -90,7 +90,7 @@
   const ws = new WebSocket((location.protocol === 'https:'? 'wss://' : 'ws://') + location.host);
 
   let myId = null;
-  let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, VEHICLE_TYPES:{} } };
+  let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:2000, VEHICLE_TYPES:{} } };
   let selected = null; // {type:'base'|'vehicle', id}
   const renderVehicles = {}; // smoothed positions
   const getBase = id => state.bases.find(b=>b.id===id);
@@ -379,7 +379,11 @@
         const vx = (rv.x - camera.x) * camera.scale;
         const vy = (rv.y - camera.y) * camera.scale;
         ctx.drawImage(img, vx - size/2, vy - size/2, size, size);
-        const frac = (v.carrying || 0) / (v.capacity || 200);
+        let frac = (v.carrying || 0) / (v.capacity || 200);
+        if (v.state === 'unloading'){
+          const total = state.cfg.UNLOAD_TIME || 2000;
+          frac *= (v.unloadTimer || 0) / total;
+        }
         if (frac > 0){
           const W = 26, H = 5;
           ctx.fillStyle = '#111'; ctx.fillRect(vx - W/2, vy - 18, W, H);

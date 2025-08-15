@@ -21,7 +21,7 @@ test('vehicle unloads cargo after delay', () => {
   };
   players.p1.vehicles.push(vehicle);
 
-  const ticks = Math.ceil(2000 / CFG.TICK_MS) + 1;
+  const ticks = Math.ceil(CFG.UNLOAD_TIME / CFG.TICK_MS) + 1;
   for (let i = 0; i < ticks; i++) gameLoop();
 
   assert.strictEqual(vehicle.carrying, 0);
