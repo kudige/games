@@ -33,6 +33,7 @@
   const toast = document.getElementById('toast');
   const vTypeSel = document.getElementById('vehicleType');
   const cursorInfo = document.getElementById('cursorInfo');
+  const addBookmarkBtn = document.getElementById('addBookmark');
 
   // Load individual SVG icons and prepare helpers
   async function loadIconSheet(size){
@@ -103,6 +104,7 @@
   const bullets = [];
   const fireTimers = Object.create(null);
   const bookmarks = [];
+  let bookmarkMode = false;
   const VEHICLE_OFFSETS = { scout: Math.PI/2 };
   const getBase = id => state.bases.find(b=>b.id===id);
 
@@ -122,6 +124,10 @@
   document.getElementById('toggleFollow').onclick = () => {
     camera.follow = !camera.follow;
     document.getElementById('toggleFollow').textContent = 'Follow: ' + (camera.follow ? 'On' : 'Off');
+  };
+  addBookmarkBtn.onclick = () => {
+    bookmarkMode = true;
+    showToast('Tap map to add bookmark');
   };
 
   function focusOn(x,y,instant){
@@ -352,7 +358,7 @@
     const sx = (e.clientX - r.left) * (canvas.width / r.width);
     const sy = (e.clientY - r.top) * (canvas.height / r.height);
     const w = toWorld(sx, sy);
-    if (e.shiftKey){
+    if (e.shiftKey || bookmarkMode){
       const bm = { x: w.x, y: w.y };
       const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
       if (baseHit){
@@ -379,6 +385,7 @@
       }
       bookmarks.push(bm);
       rebuildDashboard();
+      bookmarkMode = false;
       e.preventDefault();
       return;
     }
