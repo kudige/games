@@ -332,8 +332,10 @@ function gameLoop(){
 
       // Harvest
       if (v.carrying >= v.capacity){
-        const b = nearestBase(pl, v.x, v.y);
-        if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
+        if (v.state !== 'returning' && v.state !== 'unloading'){
+          const b = nearestBase(pl, v.x, v.y);
+          if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
+        }
       } else if (v.targetRes){
         const r = resources.find(r => r.id === v.targetRes);
         if (r && r.amount > 0){
@@ -421,4 +423,4 @@ if (process.env.NODE_ENV !== 'test'){
   server.listen(PORT, () => console.log(`TileArmy server running: http://localhost:${PORT}`));
 }
 
-module.exports = { CFG, players, bases, processManufacturing, resolveCaptures };
+module.exports = { CFG, players, bases, processManufacturing, resolveCaptures, gameLoop };
