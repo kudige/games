@@ -94,9 +94,11 @@
   const ws = new WebSocket((location.protocol === 'https:'? 'wss://' : 'ws://') + location.host);
 
   let myId = null;
-  let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:1000, VEHICLE_TYPES:{} } };
+  let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:1000, VEHICLE_TYPES:{}, BASE_HP:200, NEUTRAL_BASE_HP:150, BASE_ATTACK_RANGE:150 } };
   let selected = null; // {type:'base'|'vehicle', id}
   const renderVehicles = {}; // smoothed positions and angles
+  const bullets = [];
+  const fireTimers = Object.create(null);
   const VEHICLE_OFFSETS = { scout: Math.PI/2 };
   const getBase = id => state.bases.find(b=>b.id===id);
 
@@ -310,6 +312,76 @@
     updateCursorInfo();
   });
 
+  function spawnBullet(ax, ay, tx, ty){
+    const speed = 800;
+    const ang = Math.atan2(ty - ay, tx - ax);
+    const dist = Math.hypot(tx - ax, ty - ay);
+    bullets.push({ x: ax, y: ay, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, life: dist / speed });
+  }
+
+  function handleCombat(){
+    const range = state.cfg.BASE_ATTACK_RANGE || 0;
+    const now = performance.now() / 1000;
+    for (const b of state.bases){
+      for (const pid in state.players){
+        if (b.owner && pid === b.owner) continue;
+        const p = state.players[pid]; if (!p) continue;
+        for (const v of p.vehicles){
+          const d = Math.hypot(b.x - v.x, b.y - v.y);
+          if (d < range){
+            const key = `b${b.id}-v${v.id}`;
+            const rate = b.rof || 0;
+            if (rate > 0 && now - (fireTimers[key]||0) >= 1/rate){
+              fireTimers[key] = now;
+              spawnBullet(b.x, b.y, v.x, v.y);
+            }
+          }
+        }
+      }
+    }
+    for (const pid in state.players){
+      const p = state.players[pid]; if (!p) continue;
+      for (const v of p.vehicles){
+        if (!v.damage || !v.rof) continue;
+        for (const b of state.bases){
+          if (b.owner === pid) continue;
+          const d = Math.hypot(b.x - v.x, b.y - v.y);
+          if (d < range){
+            const key = `v${v.id}-b${b.id}`;
+            const rate = v.rof || 0;
+            if (rate > 0 && now - (fireTimers[key]||0) >= 1/rate){
+              fireTimers[key] = now;
+              spawnBullet(v.x, v.y, b.x, b.y);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function updateBullets(dt){
+    for (let i = bullets.length - 1; i >= 0; i--){
+      const b = bullets[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.life -= dt;
+      if (b.life <= 0) bullets.splice(i,1);
+    }
+  }
+
+  function drawBullets(){
+    ctx.save();
+    ctx.fillStyle = '#fde047';
+    for (const b of bullets){
+      const sx = (b.x - camera.x) * camera.scale;
+      const sy = (b.y - camera.y) * camera.scale;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 3 * camera.scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function smoothVehiclePositions(){
     const seen = new Set();
     const smooth = 0.25;
@@ -370,6 +442,16 @@
       const bx = (b.x - camera.x) * camera.scale;
       const by = (b.y - camera.y) * camera.scale;
       ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
+      const maxHp = b.owner ? (state.cfg.BASE_HP || 1) : (state.cfg.NEUTRAL_BASE_HP || 1);
+      const hpFrac = (b.hp || 0) / maxHp;
+      if (hpFrac < 1){
+        const W = baseSize;
+        const H = 6;
+        ctx.fillStyle = '#111';
+        ctx.fillRect(bx - W/2, by - baseSize/2 - 10, W, H);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(bx - W/2, by - baseSize/2 - 10, W * hpFrac, H);
+      }
       if (selected && selected.type==='base' && selected.id === b.id){
         ctx.beginPath(); ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2; ctx.arc(bx, by, 22, 0, Math.PI*2); ctx.stroke();
       }
@@ -398,6 +480,13 @@
         if (flip) ctx.scale(-1,1);
         ctx.drawImage(img, -size/2, -size/2, size, size);
         ctx.restore();
+        const maxHp = (state.cfg.VEHICLE_TYPES[v.type]||{}).hp || 1;
+        const hpFrac = (v.hp || 0) / maxHp;
+        if (hpFrac < 1){
+          const W = 26, H = 4;
+          ctx.fillStyle = '#111'; ctx.fillRect(vx - W/2, vy - 24, W, H);
+          ctx.fillStyle = '#ef4444'; ctx.fillRect(vx - W/2, vy - 24, W*hpFrac, H);
+        }
         let frac = (v.carrying || 0) / (v.capacity || 200);
         if (v.state === 'unloading'){
           const total = state.cfg.UNLOAD_TIME || 1000;
@@ -449,10 +538,13 @@
     ctx.clearRect(0,0,canvas.width,canvas.height);
     updateCamera(dt);
     smoothVehiclePositions();
+    handleCombat();
+    updateBullets(dt);
     drawGrid();
     drawResources();
     drawBases();
     drawVehicles();
+    drawBullets();
     updateCursorInfo();
     requestAnimationFrame(draw);
   }
