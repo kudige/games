@@ -712,9 +712,24 @@
     }
   }
 
+  const FPS = 30; // limit rendering to reduce CPU usage
+  const FRAME_MS = 1000 / FPS;
   let lastTime = performance.now();
+  let lastFrame = performance.now();
   function draw(now){
-    const dt = (now - lastTime) / 1000; lastTime = now;
+    if (document.hidden){
+      lastTime = now;
+      lastFrame = now;
+      requestAnimationFrame(draw);
+      return;
+    }
+    const dt = (now - lastTime) / 1000;
+    if (now - lastFrame < FRAME_MS){
+      requestAnimationFrame(draw);
+      return;
+    }
+    lastTime = now;
+    lastFrame = now;
     ctx.clearRect(0,0,canvas.width,canvas.height);
     updateCamera(dt);
     smoothVehiclePositions();
