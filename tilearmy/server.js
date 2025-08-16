@@ -163,7 +163,8 @@ wss.on('connection', (ws, req) => {
       hp: CFG.BASE_HP,
       damage: CFG.BASE_DAMAGE,
       rof: CFG.BASE_ROF,
-      queue: []
+      queue: [],
+      name: `${id} Home`
     };
     bases.push(base);
     spawnNeutralBases(CFG.CROWD);
@@ -275,9 +276,11 @@ function resolveCaptures(){
       }
       if (players[att]){
         if (!players[att].bases.includes(b.id)) players[att].bases.push(b.id);
+        const idx = players[att].bases.indexOf(b.id);
+        b.name = idx === 0 ? `${att} Home` : `${att} Base ${idx}`;
         const ws = connections[att];
         if (ws && ws.readyState === WebSocket.OPEN){
-          ws.send(JSON.stringify({ type: 'notice', ok: true, msg: `Congratulations, you have conquered base ${b.id}!` }));
+          ws.send(JSON.stringify({ type: 'notice', ok: true, msg: `Congratulations, you have conquered base ${b.name}!` }));
         }
       }
       delete b.lastAttacker;

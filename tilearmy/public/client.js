@@ -178,7 +178,7 @@
     const myBases = state.bases.filter(b=>b.owner===myId);
     myBases.forEach(b => {
       const btn = document.createElement('button');
-      btn.textContent = b.id;
+      btn.textContent = b.name || b.id;
       if (selected && selected.type==='base' && selected.id === b.id) btn.classList.add('selected');
       btn.onclick = () => { selected = {type:'base', id:b.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
       basesDiv.appendChild(btn);
@@ -199,7 +199,12 @@
       const x = Math.floor(bm.x / tile);
       const y = Math.floor(bm.y / tile);
       const span = document.createElement('span');
-      span.textContent = x + ',' + y;
+      let label = x + ',' + y;
+      if (bm.entity && bm.entity.type === 'base'){
+        const base = getBase(bm.entity.id);
+        if (base && base.name) label = base.name;
+      }
+      span.textContent = label;
       btn.appendChild(span);
 
       if (bm.entity){
@@ -310,6 +315,13 @@
     const x = Math.floor(w.x / tile);
     const y = Math.floor(w.y / tile);
     let text = `${x}, ${y}`;
+    const baseHover = findBaseAt(w.x, w.y);
+    if (baseHover){
+      text += ` | ${baseHover.owner || 'neutral'}`;
+    } else {
+      const vInfo = findVehicleAt(w.x, w.y);
+      if (vInfo){ text += ` | ${vInfo.pid}`; }
+    }
     const me = state.players[myId];
     if (me){
       let ox, oy;
