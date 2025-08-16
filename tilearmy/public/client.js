@@ -54,9 +54,28 @@
   const addBookmarkBtn = document.getElementById('addBookmark');
   const upgradeBtn = document.getElementById('upgradeBase');
   const tutorialEl = document.getElementById('tutorial');
+  const tutorialArrow = document.getElementById('tutorialArrow');
   let tutorialActive = false;
-  function showTutorial(text){ if (tutorialEl){ tutorialEl.textContent = text; tutorialEl.style.display = 'flex'; } }
+  function showTutorial(text){ if (tutorialEl){ tutorialEl.textContent = text; tutorialEl.style.display = 'flex'; tutorialEl.style.background = 'rgba(0,0,0,.6)'; tutorialEl.style.pointerEvents = 'auto'; } }
   function hideTutorial(){ if (tutorialEl){ tutorialEl.style.display = 'none'; } }
+  function moveArrow(sx, sy, ex, ey, duration){
+    if (!tutorialArrow) return;
+    const angle = Math.atan2(ey - sy, ex - sx) * 180 / Math.PI + 90;
+    tutorialArrow.style.transform = `rotate(${angle}deg)`;
+    tutorialArrow.style.left = sx + 'px';
+    tutorialArrow.style.top = sy + 'px';
+    tutorialArrow.style.display = 'block';
+    const start = performance.now();
+    function step(now){
+      const t = Math.min((now - start) / duration, 1);
+      const x = sx + (ex - sx) * t;
+      const y = sy + (ey - sy) * t;
+      tutorialArrow.style.left = x + 'px';
+      tutorialArrow.style.top = y + 'px';
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
   if (vehicleDropBtn){
     vehicleDropBtn.onclick = () => { if (tutorialActive) return; vehicleDropBtn.classList.remove('selected'); vehicleOptions.classList.toggle('show'); };
     window.addEventListener('click', e => {
@@ -359,17 +378,38 @@
     const normX = base.x - (canvas.width / normScale)/2;
     const normY = base.y - (canvas.height / normScale)/2;
     showTutorial('Welcome to the Tile Army');
-    animateCamera(zoomX, zoomY, zoomScale, 4000, () => {
-      showTutorial('This is your home base. Here you can build your army. But first you have to collect some resources. Lets create a vehicle first');
-      setTimeout(() => {
-        animateCamera(normX, normY, normScale, 1500, () => {
-          hideTutorial();
-          tutorialActive = false;
-          camera.follow = true;
-          if (vehicleDropBtn) vehicleDropBtn.classList.add('selected');
-        });
-      }, 2500);
-    });
+    setTimeout(() => {
+      showTutorial('This is your home base.');
+      animateCamera(zoomX, zoomY, zoomScale, 3000, () => {
+        showTutorial('Here you will build your army and conquer the world');
+        setTimeout(() => {
+          animateCamera(normX, normY, normScale, 1500, () => {
+            showTutorial('But first lets create a vehicle to harvest resources');
+            setTimeout(() => {
+              if (vehicleDropBtn) vehicleDropBtn.classList.add('selected');
+              tutorialEl.textContent = 'Click here to create a scout vehicle';
+              tutorialEl.style.background = 'none';
+              tutorialEl.style.pointerEvents = 'none';
+              const mapRect = mapWrap.getBoundingClientRect();
+              const fromX = (base.x - camera.x) * camera.scale + mapRect.left;
+              const fromY = (base.y - camera.y) * camera.scale + mapRect.top;
+              const dropRect = vehicleDropBtn.getBoundingClientRect();
+              const toX = dropRect.left + dropRect.width/2;
+              const toY = dropRect.top + dropRect.height/2;
+              tutorialActive = false;
+              camera.follow = true;
+              moveArrow(fromX, fromY, toX, toY, 2000);
+              if (vehicleDropBtn){
+                vehicleDropBtn.addEventListener('click', () => {
+                  hideTutorial();
+                  if (tutorialArrow) tutorialArrow.style.display = 'none';
+                }, { once:true });
+              }
+            }, 2000);
+          });
+        }, 1000);
+      });
+    }, 1000);
     localStorage.setItem('taTutorial', '1');
   }
 
