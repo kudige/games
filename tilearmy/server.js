@@ -29,7 +29,7 @@ const CFG = {
   TICK_MS: 50,
   RESOURCE_TYPES: ['ore', 'lumber', 'stone'],
   PLENTIFUL,
-  RESOURCE_COUNT: PLENTIFUL * 15,
+  RESOURCE_COUNT: PLENTIFUL * 15 * MAPSIZE,
   CROWD,
   RESOURCE_AMOUNT: 1000,     // per field
   RESOURCE_RADIUS: 22,
