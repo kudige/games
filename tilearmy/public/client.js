@@ -196,16 +196,20 @@
       btn.textContent = (b.name || b.id) + ` (Lv${b.level || 1})`;
       if (selected && selected.type==='base' && selected.id === b.id) btn.classList.add('selected');
       let clickTimer = null;
+      let prevSel = null;
       btn.addEventListener('click', () => {
+        if (!clickTimer) prevSel = selected;
         if (clickTimer) clearTimeout(clickTimer);
         clickTimer = setTimeout(() => {
           selected = {type:'base', id:b.id};
           rebuildDashboard(); updateCursorInfo(); updateSpawnControls();
           clickTimer = null;
-        }, 250);
+        }, 400);
       });
       btn.addEventListener('dblclick', () => {
         if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+        selected = prevSel;
+        rebuildDashboard(); updateCursorInfo(); updateSpawnControls();
         camera.follow = false;
         focusOn(b.x, b.y, true);
       });
