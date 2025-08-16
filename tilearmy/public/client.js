@@ -263,6 +263,7 @@
     const show = base && base.owner === myId;
     vTypeSel.style.display = show ? '' : 'none';
     document.getElementById('spawn').style.display = show ? '' : 'none';
+    if (show) refreshVehicleTypes(base); else refreshVehicleTypes(null);
     if (upgradeBtn){
       if (show){
         const lvl = base.level || 1;
@@ -273,14 +274,18 @@
     }
   }
 
-  function refreshVehicleTypes(){
+  function refreshVehicleTypes(base){
     if (!vTypeSel) return;
     vTypeSel.innerHTML = '';
     const types = state.cfg.VEHICLE_TYPES || {};
+    const allowedMap = state.cfg.BASE_LEVEL_VEHICLES || {};
+    const allowed = base ? (allowedMap[base.level || 1] || []) : Object.keys(types);
     Object.keys(types).forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t; opt.textContent = t + ` (-${types[t].cost})`;
-      vTypeSel.appendChild(opt);
+      if (!base || allowed.includes(t)){
+        const opt = document.createElement('option');
+        opt.value = t; opt.textContent = t + ` (-${types[t].cost})`;
+        vTypeSel.appendChild(opt);
+      }
     });
   }
 
