@@ -48,6 +48,7 @@
   const toast = document.getElementById('toast');
   const vTypeSel = document.getElementById('vehicleType');
   const cursorInfo = document.getElementById('cursorInfo');
+  const dirArrow = document.getElementById('dirArrow');
   const addBookmarkBtn = document.getElementById('addBookmark');
 
   // Load individual SVG icons and prepare helpers
@@ -337,6 +338,7 @@
       if (vInfo){ text += ` | ${vInfo.pid}`; }
     }
     const me = state.players[myId];
+    let showArrow = false;
     if (me){
       let ox, oy;
       if (selected && selected.type === 'base'){
@@ -349,8 +351,26 @@
       if (ox !== undefined){
         const d = Math.hypot(w.x - ox, w.y - oy) / tile;
         text += ` | ${Math.floor(d)}`;
+        if (dirArrow){
+          const ang = Math.atan2(oy - w.y, ox - w.x);
+          const infoRect = cursorInfo.getBoundingClientRect();
+          const wrapRect = mapWrap.getBoundingClientRect();
+          const cx = infoRect.left - wrapRect.left + infoRect.width/2;
+          const cy = infoRect.top - wrapRect.top + infoRect.height/2;
+          const r = Math.max(infoRect.width, infoRect.height)/2 + 12;
+          const xPos = cx + Math.cos(ang) * r;
+          const yPos = cy + Math.sin(ang) * r;
+          const aw = dirArrow.offsetWidth || 10;
+          const ah = dirArrow.offsetHeight || 10;
+          dirArrow.style.left = (xPos - aw/2) + 'px';
+          dirArrow.style.top = (yPos - ah/2) + 'px';
+          dirArrow.style.transform = `rotate(${ang * 180/Math.PI + 90}deg)`;
+          dirArrow.style.display = 'block';
+          showArrow = true;
+        }
       }
     }
+    if (dirArrow && !showArrow) dirArrow.style.display = 'none';
     cursorInfo.textContent = text;
   }
   function zoom(factor){
