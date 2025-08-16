@@ -107,6 +107,15 @@
   let bookmarkMode = false;
   const VEHICLE_OFFSETS = { scout: Math.PI/2 };
   const getBase = id => state.bases.find(b=>b.id===id);
+  const findBaseAt = (x, y) => state.bases.find(b => Math.hypot(b.x - x, b.y - y) <= (cfg.BASE_ICON_SIZE/2));
+  function findVehicleAt(x, y){
+    for (const pid in state.players){
+      const p = state.players[pid]; if (!p) continue;
+      const vh = p.vehicles.find(v => Math.hypot(v.x - x, v.y - y) <= (cfg.VEHICLE_ICON_SIZE/2));
+      if (vh) return { vehicle: vh, pid };
+    }
+    return null;
+  }
 
   // Camera
   const camera = {
@@ -275,6 +284,8 @@
   }
   let mousePx = 0, mousePy = 0;
   let dragging = false, dragPx = 0, dragPy = 0;
+  let tapStartX = 0, tapStartY = 0, tapMoved = false;
+  let lastTap = { time: 0, x: 0, y: 0 };
   function updateCursorInfo(){
     if (!cursorInfo) return;
     const tile = state.cfg.TILE_SIZE || 32;
@@ -357,20 +368,15 @@
     const w = toWorld(sx, sy);
     if (shift || bookmarkMode){
       const bm = { x: w.x, y: w.y };
-      const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
+      const baseHit = findBaseAt(w.x, w.y);
       if (baseHit){
         bm.x = baseHit.x; bm.y = baseHit.y;
         bm.entity = { type: 'base', id: baseHit.id };
       } else {
-        let vHit = null, vPid = null;
-        for (const pid in state.players){
-          const p = state.players[pid]; if (!p) continue;
-          const vh = p.vehicles.find(v => Math.hypot(v.x - w.x, v.y - w.y) <= (cfg.VEHICLE_ICON_SIZE/2));
-          if (vh){ vHit = vh; vPid = pid; break; }
-        }
-        if (vHit){
-          bm.x = vHit.x; bm.y = vHit.y;
-          bm.entity = { type: 'vehicle', id: vHit.id, pid: vPid };
+        const vInfo = findVehicleAt(w.x, w.y);
+        if (vInfo){
+          bm.x = vInfo.vehicle.x; bm.y = vInfo.vehicle.y;
+          bm.entity = { type: 'vehicle', id: vInfo.vehicle.id, pid: vInfo.pid };
         } else {
           const rr = state.cfg.RESOURCE_RADIUS || 22;
           const resHit = state.resources.find(r => Math.hypot(r.x - w.x, r.y - w.y) <= rr);
@@ -385,9 +391,26 @@
       bookmarkMode = false;
       return true; // consumed; prevent default
     }
-    const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
+    const baseHit = findBaseAt(w.x, w.y);
     if (baseHit){
-      selected = {type:'base', id: baseHit.id};
+      if (selected && selected.type==='base' && selected.id===baseHit.id){
+        selected = null;
+      } else {
+        selected = {type:'base', id: baseHit.id};
+      }
+      rebuildDashboard();
+      updateSpawnControls();
+      updateCursorInfo();
+      return false;
+    }
+    const vInfo = findVehicleAt(w.x, w.y);
+    if (vInfo && vInfo.pid === myId){
+      const vId = vInfo.vehicle.id;
+      if (selected && selected.type==='vehicle' && selected.id===vId){
+        selected = null;
+      } else {
+        selected = {type:'vehicle', id: vId};
+      }
       rebuildDashboard();
       updateSpawnControls();
       updateCursorInfo();
@@ -404,19 +427,39 @@
     return false;
   }
 
-  canvas.addEventListener('click', (e) => {
-    const r = canvas.getBoundingClientRect();
-    const sx = (e.clientX - r.left) * (canvas.width / r.width);
-    const sy = (e.clientY - r.top) * (canvas.height / r.height);
-    if (handleMapClick(sx, sy, e.shiftKey)){
-      e.preventDefault();
+  function handleMapDoubleClick(sx, sy){
+    const w = toWorld(sx, sy);
+    const baseHit = findBaseAt(w.x, w.y);
+    if (baseHit){
+      selected = {type:'base', id: baseHit.id};
+      focusOn(baseHit.x, baseHit.y, true);
+      rebuildDashboard();
+      updateSpawnControls();
+      updateCursorInfo();
+      return true;
     }
-  });
+    const vInfo = findVehicleAt(w.x, w.y);
+    if (vInfo){
+      selected = {type:'vehicle', id: vInfo.vehicle.id};
+      focusOn(vInfo.vehicle.x, vInfo.vehicle.y, true);
+      rebuildDashboard();
+      updateSpawnControls();
+      updateCursorInfo();
+      return true;
+    }
+    return false;
+  }
 
   canvas.addEventListener('pointerdown', (e) => {
+    const r = canvas.getBoundingClientRect();
+    mousePx = (e.clientX - r.left) * (canvas.width / r.width);
+    mousePy = (e.clientY - r.top) * (canvas.height / r.height);
     dragging = true;
     dragPx = e.clientX;
     dragPy = e.clientY;
+    tapStartX = e.clientX;
+    tapStartY = e.clientY;
+    tapMoved = false;
     camera.follow = false;
     if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
   });
@@ -428,6 +471,7 @@
     if (dragging){
       const dx = e.clientX - dragPx;
       const dy = e.clientY - dragPy;
+      if (Math.hypot(e.clientX - tapStartX, e.clientY - tapStartY) > 5) tapMoved = true;
       camera.x -= dx / camera.scale;
       camera.y -= dy / camera.scale;
       camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
@@ -438,57 +482,28 @@
     updateCursorInfo();
   });
 
-  // Touch events for mobile devices
-  canvas.addEventListener('touchstart', (e) => {
-    const t = e.touches[0];
-    if (!t) return;
-    const r = canvas.getBoundingClientRect();
-    mousePx = (t.clientX - r.left) * (canvas.width / r.width);
-    mousePy = (t.clientY - r.top) * (canvas.height / r.height);
-    dragging = true;
-    dragPx = t.clientX;
-    dragPy = t.clientY;
-    camera.follow = false;
-    e.preventDefault();
-  }, { passive: false });
-
-  canvas.addEventListener('touchmove', (e) => {
-    const t = e.touches[0];
-    if (!t) return;
-    const r = canvas.getBoundingClientRect();
-    mousePx = (t.clientX - r.left) * (canvas.width / r.width);
-    mousePy = (t.clientY - r.top) * (canvas.height / r.height);
-    if (dragging){
-      const dx = t.clientX - dragPx;
-      const dy = t.clientY - dragPy;
-      camera.x -= dx / camera.scale;
-      camera.y -= dy / camera.scale;
-      camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
-      camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
-      dragPx = t.clientX;
-      dragPy = t.clientY;
-    }
-    updateCursorInfo();
-    e.preventDefault();
-  }, { passive: false });
-
-  canvas.addEventListener('touchend', (e) => {
-    const t = e.changedTouches[0];
-    if (t && bookmarkMode){
-      const r = canvas.getBoundingClientRect();
-      const sx = (t.clientX - r.left) * (canvas.width / r.width);
-      const sy = (t.clientY - r.top) * (canvas.height / r.height);
-      if (handleMapClick(sx, sy, false)) e.preventDefault();
-    }
-    dragging = false;
-  }, { passive: false });
-  canvas.addEventListener('touchcancel', () => { dragging = false; });
-
   function endDrag(e){
     dragging = false;
     if (canvas.releasePointerCapture && e.pointerId !== undefined) canvas.releasePointerCapture(e.pointerId);
   }
-  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointerup', (e) => {
+    if (!tapMoved){
+      const r = canvas.getBoundingClientRect();
+      const sx = (e.clientX - r.left) * (canvas.width / r.width);
+      const sy = (e.clientY - r.top) * (canvas.height / r.height);
+      const now = performance.now();
+      const dt = now - lastTap.time;
+      const dist = Math.hypot(sx - lastTap.x, sy - lastTap.y);
+      if (dt < 300 && dist < 20){
+        if (handleMapDoubleClick(sx, sy, e.shiftKey)) e.preventDefault();
+        lastTap.time = 0;
+      } else {
+        if (handleMapClick(sx, sy, e.shiftKey)) e.preventDefault();
+        lastTap = { time: now, x: sx, y: sy };
+      }
+    }
+    endDrag(e);
+  });
   canvas.addEventListener('pointercancel', endDrag);
   canvas.addEventListener('pointerleave', () => { dragging = false; });
 
