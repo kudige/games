@@ -25,6 +25,12 @@
     #energyFill{height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#22d3ee)}
     #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:#1f254d;color:#e8eaf6;padding:8px 12px;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.35);opacity:0;transition:.25s}
     #toast.show{opacity:1}
+    .dropdown{position:relative}
+    .dropdown-content{display:none;position:absolute;top:100%;left:0;background:var(--panel);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);overflow:auto;z-index:20}
+    .dropdown-content.show{display:block}
+    .dropdown-content .option{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;gap:8px;cursor:pointer}
+    .dropdown-content .option:hover{background:#222951}
+    .resource-icon{width:16px;height:16px;margin-right:4px;vertical-align:middle}
     .bookmark-icon{width:16px;height:16px;margin-right:4px;vertical-align:middle}
   </style>
 </head>
@@ -32,8 +38,10 @@
   <header>
     <h1>TileArmy</h1>
     <div class="row">
-      <select id="vehicleType" style="display:none"></select>
-      <button id="spawn" class="primary" style="display:none">Spawn Vehicle</button>
+      <div id="vehicleDropdown" class="dropdown" style="display:none">
+        <button id="vehicleDropBtn" class="primary">Spawn Vehicle</button>
+        <div id="vehicleOptions" class="dropdown-content"></div>
+      </div>
       <button id="upgradeBase" style="display:none">Upgrade Base</button>
       <button id="toggleFollow">Follow: On</button>
       <button id="addBookmark">Add Bookmark</button>
