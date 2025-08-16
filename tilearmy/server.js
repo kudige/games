@@ -228,12 +228,16 @@ wss.on('connection', (ws, req) => {
     }
   });
 
-  ws.on('close', () => {
-    // Keep player state so they can reconnect later; just remove the socket
-    if (connections[id] === ws) delete connections[id];
-    if (players[id]) players[id].disconnectedAt = Date.now();
-  });
+  ws.on('close', () => handleDisconnect(id, ws));
 });
+
+function handleDisconnect(id, ws){
+  // Keep player state so they can reconnect later; just remove the socket
+  if (connections[id] === ws) {
+    delete connections[id];
+    if (players[id]) players[id].disconnectedAt = Date.now();
+  }
+}
 
 // ------------------ SIMULATION ------------------
 function processManufacturing(now){
@@ -477,4 +481,14 @@ if (process.env.NODE_ENV !== 'test'){
   server.listen(PORT, () => console.log(`TileArmy server running: http://localhost:${PORT}`));
 }
 
-module.exports = { CFG, players, bases, resources, processManufacturing, resolveCaptures, gameLoop };
+module.exports = {
+  CFG,
+  players,
+  bases,
+  resources,
+  connections,
+  processManufacturing,
+  resolveCaptures,
+  gameLoop,
+  handleDisconnect,
+};
