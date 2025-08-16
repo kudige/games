@@ -46,9 +46,11 @@ const CFG = {
   NEUTRAL_BASE_HP: 150,
   NEUTRAL_BASE_DAMAGE: 5,
   NEUTRAL_BASE_ROF: 0.5,
+  // Vehicles unlocked at each base level. Higher levels can spawn all
+  // vehicles from previous tiers.
   BASE_LEVEL_VEHICLES: {
     1: ['scout'],
-    2: ['scout', 'hauler', 'lightTank'],
+    2: ['hauler', 'lightTank'],
     3: ['basic', 'heavyTank'],
     4: ['transport'],
   },
@@ -72,6 +74,16 @@ const resources = []; // [{id,type,x,y,amount}]
 const bases = []; // [{id,x,y,owner,hp,damage,rof,level,queue}]
 const connections = Object.create(null); // playerId -> ws
 let seeded = false;
+
+function vehiclesForBaseLevel(level){
+  const allowed = [];
+  for (let l = 1; l <= level; l++){
+    for (const v of CFG.BASE_LEVEL_VEHICLES[l] || []){
+      if (!allowed.includes(v)) allowed.push(v);
+    }
+  }
+  return allowed;
+}
 
 function baseUpgradeCost(level){
   return { lumber: 200 * level, stone: 150 * level };
@@ -101,7 +113,7 @@ function spawnVehicle(playerId, baseId, vType){
   const pl = players[playerId]; if (!pl) return { ok: false, msg: 'Player not found' };
   const base = bases.find(b => b.id === baseId && b.owner === playerId); if (!base) return { ok: false, msg: 'Base not found' };
   const lvl = base.level || 1;
-  const allowed = CFG.BASE_LEVEL_VEHICLES[lvl] || [];
+  const allowed = vehiclesForBaseLevel(lvl);
   if (!allowed.includes(vType)) return { ok: false, msg: 'Vehicle not available at this base level' };
   const vt = CFG.VEHICLE_TYPES[vType];
   if (!vt) return { ok: false, msg: 'Unknown vehicle type' };

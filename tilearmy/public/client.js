@@ -278,8 +278,7 @@
     if (!vTypeSel) return;
     vTypeSel.innerHTML = '';
     const types = state.cfg.VEHICLE_TYPES || {};
-    const allowedMap = state.cfg.BASE_LEVEL_VEHICLES || {};
-    const allowed = base ? (allowedMap[base.level || 1] || []) : Object.keys(types);
+    const allowed = base ? allowedVehicles(base.level || 1) : Object.keys(types);
     Object.keys(types).forEach(t => {
       if (!base || allowed.includes(t)){
         const opt = document.createElement('option');
@@ -287,6 +286,15 @@
         vTypeSel.appendChild(opt);
       }
     });
+  }
+
+  function allowedVehicles(level){
+    const map = state.cfg.BASE_LEVEL_VEHICLES || {};
+    const allowed = [];
+    for (let l = 1; l <= level; l++){
+      (map[l] || []).forEach(v => { if (!allowed.includes(v)) allowed.push(v); });
+    }
+    return allowed;
   }
 
   ws.onmessage = (e) => {

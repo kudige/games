@@ -23,10 +23,12 @@ test('base level restricts spawnable vehicles', () => {
 
   base.level = 3;
   assert.strictEqual(spawnVehicle('p1', 'b1', 'basic').ok, true);
+  assert.strictEqual(spawnVehicle('p1', 'b1', 'hauler').ok, true);
   assert.strictEqual(spawnVehicle('p1', 'b1', 'transport').ok, false);
 
   base.level = 4;
   assert.strictEqual(spawnVehicle('p1', 'b1', 'transport').ok, true);
+  assert.strictEqual(spawnVehicle('p1', 'b1', 'heavyTank').ok, true);
 });
 
 test('transport unloads cargo instantly', () => {

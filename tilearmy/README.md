@@ -33,7 +33,7 @@ MAPSIZE=5 PLENTIFUL=2 CROWD=1 node server.js
 ## Gameplay
 
 - **Base & Resources** – You start with a base and some ore. Additional resources (ore, lumber and stone) are scattered around the world. Your goal is to gather them.
-- **Vehicles** – Use the dashboard to spawn vehicles. Each type (scout, hauler, basic, light tank, heavy tank, transport) has different speed, capacity, energy usage and cost. Bases unlock vehicles by level: level 1 scouts; level 2 scouts, haulers and light tanks; level 3 basic and heavy tanks; level 4 transports.
+- **Vehicles** – Use the dashboard to spawn vehicles. Each type (scout, hauler, basic, light tank, heavy tank, transport) has different speed, capacity, energy usage and cost. Bases unlock vehicles by level: level 1 scouts; level 2 add haulers and light tanks; level 3 add basic and heavy tanks; level 4 adds transports. Higher-level bases can build all vehicles from previous levels.
 - **Base Upgrades** – Spend lumber and stone to upgrade your bases, increasing their HP and attack power.
 - **Automatic harvesting** – Idle vehicles automatically seek the nearest unclaimed resource. If you click a resource tile, the selected vehicle will harvest it and then automatically chain to nearby resources of the same type within a search radius before considering other resources. Once full, vehicles return to your base to unload.
 - **Manual commands** – Click on the map to move the selected vehicle. Use the dropdown to spawn different vehicle types.
