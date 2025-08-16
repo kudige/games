@@ -10,7 +10,7 @@ function resetState(){
 
 test('base captured after HP reaches zero', () => {
   resetState();
-  players.attacker = { bases: [], vehicles: [] };
+  players.attacker = { bases: ['h0'], vehicles: [] };
   players.defender = { bases: ['b1'], vehicles: [] };
   const base = { id: 'b1', x: 0, y: 0, owner: 'defender', hp: 0, damage: CFG.NEUTRAL_BASE_DAMAGE, rof: CFG.NEUTRAL_BASE_ROF, queue: [], lastAttacker: 'attacker' };
   bases.push(base);
@@ -19,6 +19,7 @@ test('base captured after HP reaches zero', () => {
 
   assert.strictEqual(base.owner, 'attacker');
   assert.strictEqual(base.hp, CFG.BASE_HP);
+  assert.strictEqual(base.name, 'attacker Base 1');
   assert.deepStrictEqual(players.defender.bases, []);
   assert.ok(players.attacker.bases.includes('b1'));
 });
