@@ -264,6 +264,7 @@
     const show = base && base.owner === myId;
     vTypeSel.style.display = show ? '' : 'none';
     document.getElementById('spawn').style.display = show ? '' : 'none';
+    if (show) refreshVehicleTypes(base); else refreshVehicleTypes(null);
     if (upgradeBtn){
       if (show){
         const lvl = base.level || 1;
@@ -274,15 +275,33 @@
     }
   }
 
-  function refreshVehicleTypes(){
+  function refreshVehicleTypes(base){
     if (!vTypeSel) return;
-    vTypeSel.innerHTML = '';
     const types = state.cfg.VEHICLE_TYPES || {};
-    Object.keys(types).forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t; opt.textContent = t + ` (-${types[t].cost})`;
-      vTypeSel.appendChild(opt);
+    const allowed = base ? allowedVehicles(base.level || 1) : Object.keys(types);
+    const key = allowed.join(',');
+    if (refreshVehicleTypes._lastKey === key) return;
+    refreshVehicleTypes._lastKey = key;
+    const prev = vTypeSel.value;
+    vTypeSel.innerHTML = '';
+    allowed.forEach(t => {
+      if (types[t]){
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t + ` (-${types[t].cost})`;
+        vTypeSel.appendChild(opt);
+      }
     });
+    if (allowed.includes(prev)) vTypeSel.value = prev;
+  }
+
+  function allowedVehicles(level){
+    const map = state.cfg.BASE_LEVEL_VEHICLES || {};
+    const allowed = [];
+    for (let l = 1; l <= level; l++){
+      (map[l] || []).forEach(v => { if (!allowed.includes(v)) allowed.push(v); });
+    }
+    return allowed;
   }
 
   ws.onmessage = (e) => {

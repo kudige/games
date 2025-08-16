@@ -46,12 +46,21 @@ const CFG = {
   NEUTRAL_BASE_HP: 150,
   NEUTRAL_BASE_DAMAGE: 5,
   NEUTRAL_BASE_ROF: 0.5,
+  // Vehicles unlocked at each base level. Higher levels can spawn all
+  // vehicles from previous tiers.
+  BASE_LEVEL_VEHICLES: {
+    1: ['scout'],
+    2: ['hauler', 'lightTank'],
+    3: ['basic', 'heavyTank'],
+    4: ['transport'],
+  },
   VEHICLE_TYPES: {
     scout:   { speed: 260, capacity: 120, energy: 0.015, hp: 60,  damage: 6,  rof: 1,   build: 1, cost: 800 },
     hauler:  { speed: 180, capacity: 400, energy: 0.03,  hp: 140, damage: 12, rof: 0.8, build: 3, cost: 1500 },
     basic:   { speed: 220, capacity: 200, energy: 0.02,  hp: 100, damage: 8,  rof: 1,   build: 2, cost: 1000 },
     lightTank: { speed: 200, capacity: 0,   energy: 0.04, hp: 180, damage: 20, rof: 1.2, build: 4, cost: 2000 },
     heavyTank: { speed: 150, capacity: 0,   energy: 0.06, hp: 300, damage: 35, rof: 0.8, build: 6, cost: 3500 },
+    transport: { speed: 150, capacity: 1000, energy: 0.05, hp: 200, damage: 0, rof: 0, build: 8, cost: 5000, harvestRate: 200, unloadTime: 0 },
   },
 };
 
@@ -65,6 +74,16 @@ const resources = []; // [{id,type,x,y,amount}]
 const bases = []; // [{id,x,y,owner,hp,damage,rof,level,queue}]
 const connections = Object.create(null); // playerId -> ws
 let seeded = false;
+
+function vehiclesForBaseLevel(level){
+  const allowed = [];
+  for (let l = 1; l <= level; l++){
+    for (const v of CFG.BASE_LEVEL_VEHICLES[l] || []){
+      if (!allowed.includes(v)) allowed.push(v);
+    }
+  }
+  return allowed;
+}
 
 function baseUpgradeCost(level){
   return { lumber: 200 * level, stone: 150 * level };
@@ -88,6 +107,22 @@ function upgradeBase(playerId, baseId){
   b.level = lvl + 1;
   applyBaseStats(b);
   return true;
+}
+
+function spawnVehicle(playerId, baseId, vType){
+  const pl = players[playerId]; if (!pl) return { ok: false, msg: 'Player not found' };
+  const base = bases.find(b => b.id === baseId && b.owner === playerId); if (!base) return { ok: false, msg: 'Base not found' };
+  const lvl = base.level || 1;
+  const allowed = vehiclesForBaseLevel(lvl);
+  if (!allowed.includes(vType)) return { ok: false, msg: 'Vehicle not available at this base level' };
+  const vt = CFG.VEHICLE_TYPES[vType];
+  if (!vt) return { ok: false, msg: 'Unknown vehicle type' };
+  if (pl.ore < vt.cost) return { ok: false, msg: 'Not enough ore to spawn vehicle' };
+  pl.ore -= vt.cost;
+  const readyAt = Date.now() + (vt.build || 0) * 1000;
+  if (!base.queue) base.queue = [];
+  base.queue.push({ vType, readyAt });
+  return { ok: true, msg: `Vehicle manufacturing (${vt.build || 0}s)` };
 }
 
 function seedResources(){
@@ -132,6 +167,7 @@ function snapshotState(){
       ENERGY_MAX: CFG.ENERGY_MAX,
       UNLOAD_TIME: CFG.UNLOAD_TIME,
       VEHICLE_TYPES: CFG.VEHICLE_TYPES,
+      BASE_LEVEL_VEHICLES: CFG.BASE_LEVEL_VEHICLES,
       BASE_ICON_SIZE,
       VEHICLE_ICON_SIZE,
       RESOURCE_ICON_SIZE,
@@ -217,17 +253,8 @@ wss.on('connection', (ws, req) => {
     const me = players[id]; if (!me) return;
 
     if (msg.type === 'spawnVehicle') {
-      const base = bases.find(b => b.id === msg.baseId && b.owner === id);
-      if (!base) return;
-      const vt = CFG.VEHICLE_TYPES[msg.vType] || CFG.VEHICLE_TYPES.basic;
-      if (me.ore >= vt.cost){
-        me.ore -= vt.cost;
-        const readyAt = Date.now() + (vt.build || 0) * 1000;
-        base.queue.push({ vType: msg.vType || 'basic', readyAt });
-        ws.send(JSON.stringify({ type: 'notice', ok: true, msg: `Vehicle manufacturing (${vt.build||0}s)` }));
-      } else {
-        ws.send(JSON.stringify({ type: 'notice', ok: false, msg: 'Not enough ore to spawn vehicle' }));
-      }
+      const res = spawnVehicle(id, msg.baseId, msg.vType || 'basic');
+      ws.send(JSON.stringify({ type: 'notice', ok: res.ok, msg: res.msg }));
     }
     else if (msg.type === 'moveVehicle') {
       const v = me.vehicles.find(v => v.id === msg.vehicleId);
@@ -286,6 +313,8 @@ function processManufacturing(now){
         hp: vt.hp,
         damage: vt.damage,
         rof: vt.rof,
+        harvestRate: vt.harvestRate,
+        unloadTime: vt.unloadTime,
         x: b.x + CFG.TILE_SIZE,
         y: b.y,
         tx: b.x + CFG.TILE_SIZE,
@@ -328,7 +357,6 @@ function resolveCaptures(){
 
 function gameLoop(){
   const dt = CFG.TICK_MS/1000;
-  const harvestStep = CFG.HARVEST_RATE * dt;
   const rechargeStep = CFG.ENERGY_RECHARGE * dt;
   const now = Date.now();
 
@@ -402,7 +430,7 @@ function gameLoop(){
           if (base && Math.hypot(v.x-base.x, v.y-base.y) < 30){
             if (v.state !== 'unloading'){
               v.state = 'unloading';
-              v.unloadTimer = CFG.UNLOAD_TIME;
+              v.unloadTimer = v.unloadTime ?? CFG.UNLOAD_TIME;
             } else {
               v.unloadTimer -= CFG.TICK_MS;
               if (v.unloadTimer <= 0){
@@ -416,6 +444,7 @@ function gameLoop(){
 
       // Harvest
       if (v.capacity > 0){
+        const harvestStep = (v.harvestRate || CFG.HARVEST_RATE) * dt;
         if (v.carrying >= v.capacity){
           if (v.state !== 'returning' && v.state !== 'unloading'){
             const b = nearestBase(pl, v.x, v.y);
@@ -521,4 +550,5 @@ module.exports = {
   handleDisconnect,
   upgradeBase,
   baseUpgradeCost,
+  spawnVehicle,
 };
