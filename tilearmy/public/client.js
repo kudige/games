@@ -176,7 +176,8 @@
 
     me.vehicles.forEach(v => {
       const btn = document.createElement('button');
-      btn.textContent = v.id + ' ' + (v.type||'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
+      const moving = Math.hypot((v.tx ?? v.x) - v.x, (v.ty ?? v.y) - v.y) > 1;
+      btn.textContent = v.id + ' ' + (v.type||'') + (moving?' →':'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
       if (selected && selected.type==='vehicle' && selected.id === v.id) btn.classList.add('selected');
       btn.onclick = () => { selected = {type:'vehicle', id:v.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
       vehiclesDiv.appendChild(btn);
@@ -637,6 +638,28 @@
       const bx = (b.x - camera.x) * camera.scale;
       const by = (b.y - camera.y) * camera.scale;
       ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
+
+      if (b.queue && b.queue.length){
+        const item = b.queue[0];
+        const vt = state.cfg.VEHICLE_TYPES[item.vType] || state.cfg.VEHICLE_TYPES.basic || {};
+        const buildMs = (vt.build || 0) * 1000;
+        if (buildMs > 0){
+          const start = item.readyAt - buildMs;
+          const prog = Math.min(1, Math.max(0, (Date.now() - start) / buildMs));
+          const r = baseSize/2 + 6;
+          ctx.beginPath();
+          ctx.strokeStyle = '#111';
+          ctx.lineWidth = 4;
+          ctx.arc(bx, by, r, 0, Math.PI*2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.strokeStyle = '#4ade80';
+          ctx.lineWidth = 4;
+          ctx.arc(bx, by, r, -Math.PI/2, -Math.PI/2 + prog*Math.PI*2);
+          ctx.stroke();
+        }
+      }
+
       const maxHp = b.owner ? (state.cfg.BASE_HP || 1) : (state.cfg.NEUTRAL_BASE_HP || 1);
       const hpFrac = (b.hp || 0) / maxHp;
       if (hpFrac < 1){
