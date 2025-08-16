@@ -656,8 +656,8 @@
         const offset = VEHICLE_OFFSETS[v.type] || 0;
         ctx.save();
         ctx.translate(vx, vy);
-        ctx.rotate(ang + offset);
         if (flip) ctx.scale(-1,1);
+        ctx.rotate(ang + offset);
         ctx.drawImage(img, -size/2, -size/2, size, size);
         ctx.restore();
         const maxHp = (state.cfg.VEHICLE_TYPES[v.type]||{}).hp || 1;
