@@ -12,7 +12,9 @@ TileArmy is a browser-based real-time resource-gathering game built with Node.js
    ```bash
    node server.js
    ```
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
+3. Open [http://localhost:3000](http://localhost:3000) in your browser. You'll be prompted to choose a
+   player name which acts as your ID. The name must be unique and is saved in your browser so refreshing or
+   reconnecting will continue your existing game.
 
 ## Configuration
 

@@ -78,6 +78,18 @@
     stone: resourceSheet.makeImg('icon-stone-quarry')
   };
 
+  // Determine player name. Use cached name if available; otherwise prompt
+  let myName = localStorage.getItem('taName');
+  while (!myName) {
+    myName = prompt('Enter player name');
+  }
+
+  const ws = new WebSocket(
+    (location.protocol === 'https:' ? 'wss://' : 'ws://') +
+    location.host +
+    '?name=' + encodeURIComponent(myName)
+  );
+
   const teamIcons = {}; // cache per player
   function getTeamIcons(pid, color){
     if (!teamIcons[pid]){
@@ -94,8 +106,6 @@
   }
 
   function showToast(text){ toast.textContent = text; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1500); }
-
-  const ws = new WebSocket((location.protocol === 'https:'? 'wss://' : 'ws://') + location.host);
 
   let myId = null;
   let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:1000, VEHICLE_TYPES:{}, BASE_HP:200, NEUTRAL_BASE_HP:150, BASE_ATTACK_RANGE:150 } };
@@ -250,6 +260,7 @@
     const msg = JSON.parse(e.data);
     if (msg.type === 'init') {
       myId = msg.id; state = msg.state || state; pidEl.textContent = 'Player ' + myId;
+      localStorage.setItem('taName', myId);
       const myBases = state.bases.filter(b=>b.owner===myId);
       if (myBases.length){
         selected = {type:'base', id: myBases[0].id};
@@ -272,6 +283,10 @@
       updateSpawnControls();
     } else if (msg.type === 'notice') {
       showToast(msg.msg || (msg.ok?'OK':'Error'));
+    } else if (msg.type === 'error') {
+      alert(msg.msg || 'Error');
+      localStorage.removeItem('taName');
+      location.reload();
     }
   };
 

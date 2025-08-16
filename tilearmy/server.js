@@ -130,32 +130,54 @@ function nearestBase(pl, x, y){
   return best;
 }
 
-wss.on('connection', (ws) => {
+// Handle new WebSocket connections. The client supplies a player name via query
+// string (?name=foo). The name acts as a persistent ID so returning players can
+// continue where they left off, and two players cannot share the same name.
+wss.on('connection', (ws, req) => {
   seedResources();
-  const id = newId(8);
-  const bx = Math.floor(rand(200, CFG.MAP_W - 200) / CFG.TILE_SIZE);
-  const by = Math.floor(rand(200, CFG.MAP_H - 200) / CFG.TILE_SIZE);
-  const base = {
-    id: newId(6),
-    x: bx * CFG.TILE_SIZE,
-    y: by * CFG.TILE_SIZE,
-    owner: id,
-    hp: CFG.BASE_HP,
-    damage: CFG.BASE_DAMAGE,
-    rof: CFG.BASE_ROF,
-    queue: []
-  };
-  bases.push(base);
-  spawnNeutralBases(CFG.CROWD);
-  players[id] = {
-    bases: [base.id],
-    vehicles: [],
-    color: `hsl(${Math.floor(rand(0,360))} 70% 55%)`,
-    ore: 2000, // start with some ore
-    lumber: 0,
-    stone: 0,
-    energy: CFG.ENERGY_MAX
-  };
+  
+  const params = new URL(req.url, 'http://localhost');
+  const id = params.searchParams.get('name');
+  if (!id) {
+    ws.send(JSON.stringify({ type: 'error', msg: 'Name required' }));
+    ws.close();
+    return;
+  }
+
+  // If the name already has an active connection, reject the newcomer
+  if (connections[id] && connections[id].readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'error', msg: 'Name taken' }));
+    ws.close();
+    return;
+  }
+
+  // New player
+  if (!players[id]) {
+    const bx = Math.floor(rand(200, CFG.MAP_W - 200) / CFG.TILE_SIZE);
+    const by = Math.floor(rand(200, CFG.MAP_H - 200) / CFG.TILE_SIZE);
+    const base = {
+      id: newId(6),
+      x: bx * CFG.TILE_SIZE,
+      y: by * CFG.TILE_SIZE,
+      owner: id,
+      hp: CFG.BASE_HP,
+      damage: CFG.BASE_DAMAGE,
+      rof: CFG.BASE_ROF,
+      queue: []
+    };
+    bases.push(base);
+    spawnNeutralBases(CFG.CROWD);
+    players[id] = {
+      bases: [base.id],
+      vehicles: [],
+      color: `hsl(${Math.floor(rand(0,360))} 70% 55%)`,
+      ore: 2000, // start with some ore
+      lumber: 0,
+      stone: 0,
+      energy: CFG.ENERGY_MAX
+    };
+  }
+
   connections[id] = ws;
 
   ws.send(JSON.stringify({ type: 'init', id, state: snapshotState() }));
@@ -201,20 +223,8 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    const pl = players[id];
-    if (pl){
-      for (const bid of pl.bases){
-        const b = bases.find(b=>b.id===bid);
-        if (b){
-          b.owner = null;
-          b.hp = CFG.NEUTRAL_BASE_HP;
-          b.damage = CFG.NEUTRAL_BASE_DAMAGE;
-          b.rof = CFG.NEUTRAL_BASE_ROF;
-        }
-      }
-    }
-    delete players[id];
-    delete connections[id];
+    // Keep player state so they can reconnect later; just remove the socket
+    if (connections[id] === ws) delete connections[id];
   });
 });
 
