@@ -18,13 +18,19 @@ function nearestIconSize(val) {
 const BASE_ICON_SIZE = nearestIconSize(parseInt(process.env.BASE_ICON_SIZE, 10) || 32);
 const VEHICLE_ICON_SIZE = nearestIconSize(parseInt(process.env.VEHICLE_ICON_SIZE, 10) || 32);
 const RESOURCE_ICON_SIZE = nearestIconSize(parseInt(process.env.RESOURCE_ICON_SIZE, 10) || 32);
+const MAPSIZE = parseInt(process.env.MAPSIZE, 10) || 10;
+const PLENTIFUL = parseInt(process.env.PLENTIFUL, 10) || 4;
+const CROWD = parseInt(process.env.CROWD, 10) || 3;
 const CFG = {
   TILE_SIZE: parseInt(process.env.TILE_SIZE, 10) || 32,
-  MAP_W: 4000,
-  MAP_H: 3000,
+  MAP_W: 4000 * MAPSIZE,
+  MAP_H: 3000 * MAPSIZE,
+  MAPSIZE,
   TICK_MS: 50,
   RESOURCE_TYPES: ['ore', 'lumber', 'stone'],
-  RESOURCE_COUNT: 60,
+  PLENTIFUL,
+  RESOURCE_COUNT: PLENTIFUL * 15,
+  CROWD,
   RESOURCE_AMOUNT: 1000,     // per field
   RESOURCE_RADIUS: 22,
   HARVEST_SEARCH_RADIUS: 300, // search radius for auto-harvest chaining
@@ -33,7 +39,6 @@ const CFG = {
   ENERGY_RECHARGE: 15,       // energy/sec auto recharge
   UNLOAD_TIME: 1000,         // ms to unload at base
   BASE_ATTACK_RANGE: 150,
-  NEUTRAL_BASE_COUNT: 5,
   BASE_HP: 200,
   BASE_DAMAGE: 15,
   BASE_ROF: 1,
@@ -59,8 +64,6 @@ const resources = []; // [{id,type,x,y,amount}]
 const bases = []; // [{id,x,y,owner,hp,damage,rof,queue}]
 const connections = Object.create(null); // playerId -> ws
 let seeded = false;
-let basesSeeded = false;
-
 
 function seedResources(){
   if (seeded) return;
@@ -74,9 +77,8 @@ function seedResources(){
   seeded = true;
 }
 
-function seedBases(){
-  if (basesSeeded) return;
-  for (let i=0;i<CFG.NEUTRAL_BASE_COUNT;i++){
+function spawnNeutralBases(count){
+  for (let i=0;i<count;i++){
     const bx = Math.floor(rand(200, CFG.MAP_W - 200) / CFG.TILE_SIZE);
     const by = Math.floor(rand(200, CFG.MAP_H - 200) / CFG.TILE_SIZE);
     bases.push({
@@ -90,7 +92,6 @@ function seedBases(){
       queue: []
     });
   }
-  basesSeeded = true;
 }
 
 function snapshotState(){
@@ -131,7 +132,6 @@ function nearestBase(pl, x, y){
 
 wss.on('connection', (ws) => {
   seedResources();
-  seedBases();
   const id = newId(8);
   const bx = Math.floor(rand(200, CFG.MAP_W - 200) / CFG.TILE_SIZE);
   const by = Math.floor(rand(200, CFG.MAP_H - 200) / CFG.TILE_SIZE);
@@ -146,6 +146,7 @@ wss.on('connection', (ws) => {
     queue: []
   };
   bases.push(base);
+  spawnNeutralBases(CFG.CROWD);
   players[id] = {
     bases: [base.id],
     vehicles: [],
