@@ -62,9 +62,33 @@ const wss = new WebSocket.Server({ server });
 
 const players = Object.create(null); // { id: { bases, vehicles, color, ore, lumber, stone, energy } }
 const resources = []; // [{id,type,x,y,amount}]
-const bases = []; // [{id,x,y,owner,hp,damage,rof,queue}]
+const bases = []; // [{id,x,y,owner,hp,damage,rof,level,queue}]
 const connections = Object.create(null); // playerId -> ws
 let seeded = false;
+
+function baseUpgradeCost(level){
+  return { lumber: 200 * level, stone: 150 * level };
+}
+
+function applyBaseStats(base){
+  const lvl = base.level || 1;
+  base.damage = CFG.BASE_DAMAGE + (lvl - 1) * 5;
+  base.rof = CFG.BASE_ROF;
+  base.hp = CFG.BASE_HP + (lvl - 1) * 100;
+}
+
+function upgradeBase(playerId, baseId){
+  const pl = players[playerId]; if (!pl) return false;
+  const b = bases.find(b => b.id === baseId && b.owner === playerId); if (!b) return false;
+  const lvl = b.level || 1;
+  const cost = baseUpgradeCost(lvl);
+  if ((pl.lumber || 0) < cost.lumber || (pl.stone || 0) < cost.stone) return false;
+  pl.lumber -= cost.lumber;
+  pl.stone -= cost.stone;
+  b.level = lvl + 1;
+  applyBaseStats(b);
+  return true;
+}
 
 function seedResources(){
   if (seeded) return;
@@ -90,6 +114,7 @@ function spawnNeutralBases(count){
       hp: CFG.NEUTRAL_BASE_HP,
       damage: CFG.NEUTRAL_BASE_DAMAGE,
       rof: CFG.NEUTRAL_BASE_ROF,
+      level: 1,
       queue: []
     });
   }
@@ -161,12 +186,11 @@ wss.on('connection', (ws, req) => {
       x: bx * CFG.TILE_SIZE,
       y: by * CFG.TILE_SIZE,
       owner: id,
-      hp: CFG.BASE_HP,
-      damage: CFG.BASE_DAMAGE,
-      rof: CFG.BASE_ROF,
+      level: 1,
       queue: [],
       name: `${id} Home`
     };
+    applyBaseStats(base);
     bases.push(base);
     spawnNeutralBases(CFG.CROWD);
     players[id] = {
@@ -226,6 +250,11 @@ wss.on('connection', (ws, req) => {
         v.state = 'idle';
       }
     }
+    else if (msg.type === 'upgradeBase') {
+      const ok = upgradeBase(id, msg.baseId);
+      if (ok) ws.send(JSON.stringify({ type: 'notice', ok: true, msg: 'Base upgraded' }));
+      else ws.send(JSON.stringify({ type: 'notice', ok: false, msg: 'Not enough resources to upgrade base' }));
+    }
   });
 
   ws.on('close', () => handleDisconnect(id, ws));
@@ -278,9 +307,8 @@ function resolveCaptures(){
       const prev = b.owner;
       const att = b.lastAttacker;
       b.owner = att;
-      b.hp = CFG.BASE_HP;
-      b.damage = CFG.BASE_DAMAGE;
-      b.rof = CFG.BASE_ROF;
+      b.level = 1;
+      applyBaseStats(b);
       if (prev && players[prev]){
         players[prev].bases = players[prev].bases.filter(id=>id!==b.id);
       }
@@ -491,4 +519,6 @@ module.exports = {
   resolveCaptures,
   gameLoop,
   handleDisconnect,
+  upgradeBase,
+  baseUpgradeCost,
 };
