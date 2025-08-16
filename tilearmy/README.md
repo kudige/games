@@ -16,6 +16,20 @@ TileArmy is a browser-based real-time resource-gathering game built with Node.js
    player name which acts as your ID. The name must be unique and is saved in your browser so refreshing or
    reconnecting will continue your existing game.
 
+## Configuration
+
+You can tweak gameplay by setting environment variables before starting the server:
+
+- `MAPSIZE` – scales map dimensions from the base 4000×3000. A value of `10` results in a 40000×30000 world. Default: `10`.
+- `PLENTIFUL` – controls how many resource nodes spawn. Higher values mean more resources. Default: `4`.
+- `CROWD` – number of neutral bases spawned each time a player joins. Default: `3`.
+
+Example:
+
+```bash
+MAPSIZE=5 PLENTIFUL=2 CROWD=1 node server.js
+```
+
 ## Gameplay
 
 - **Base & Resources** – You start with a base and some ore. Additional resources (ore, lumber and stone) are scattered around the world. Your goal is to gather them.
