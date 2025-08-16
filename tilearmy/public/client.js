@@ -276,16 +276,22 @@
 
   function refreshVehicleTypes(base){
     if (!vTypeSel) return;
-    vTypeSel.innerHTML = '';
     const types = state.cfg.VEHICLE_TYPES || {};
     const allowed = base ? allowedVehicles(base.level || 1) : Object.keys(types);
-    Object.keys(types).forEach(t => {
-      if (!base || allowed.includes(t)){
+    const key = allowed.join(',');
+    if (refreshVehicleTypes._lastKey === key) return;
+    refreshVehicleTypes._lastKey = key;
+    const prev = vTypeSel.value;
+    vTypeSel.innerHTML = '';
+    allowed.forEach(t => {
+      if (types[t]){
         const opt = document.createElement('option');
-        opt.value = t; opt.textContent = t + ` (-${types[t].cost})`;
+        opt.value = t;
+        opt.textContent = t + ` (-${types[t].cost})`;
         vTypeSel.appendChild(opt);
       }
     });
+    if (allowed.includes(prev)) vTypeSel.value = prev;
   }
 
   function allowedVehicles(level){
