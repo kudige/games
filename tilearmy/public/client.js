@@ -285,6 +285,7 @@
   let mousePx = 0, mousePy = 0;
   let dragging = false, dragPx = 0, dragPy = 0;
   let tapStartX = 0, tapStartY = 0, tapMoved = false;
+  let swipeVx = 0, swipeVy = 0, lastMoveTime = 0;
   let lastTap = { time: 0, x: 0, y: 0 };
   function updateCursorInfo(){
     if (!cursorInfo) return;
@@ -460,7 +461,9 @@
     tapStartX = e.clientX;
     tapStartY = e.clientY;
     tapMoved = false;
+    swipeVx = 0; swipeVy = 0; lastMoveTime = performance.now();
     camera.follow = false;
+    camera.vx = 0; camera.vy = 0;
     if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
   });
 
@@ -469,8 +472,14 @@
     mousePx = (e.clientX - r.left) * (canvas.width / r.width);
     mousePy = (e.clientY - r.top) * (canvas.height / r.height);
     if (dragging){
+      const now = performance.now();
       const dx = e.clientX - dragPx;
       const dy = e.clientY - dragPy;
+      const dt = (now - lastMoveTime) / 1000;
+      if (dt > 0){
+        swipeVx = -dx / camera.scale / dt;
+        swipeVy = -dy / camera.scale / dt;
+      }
       if (Math.hypot(e.clientX - tapStartX, e.clientY - tapStartY) > 5) tapMoved = true;
       camera.x -= dx / camera.scale;
       camera.y -= dy / camera.scale;
@@ -478,6 +487,7 @@
       camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
       dragPx = e.clientX;
       dragPy = e.clientY;
+      lastMoveTime = now;
     }
     updateCursorInfo();
   });
@@ -501,6 +511,9 @@
         if (handleMapClick(sx, sy, e.shiftKey)) e.preventDefault();
         lastTap = { time: now, x: sx, y: sy };
       }
+    } else {
+      camera.vx = swipeVx;
+      camera.vy = swipeVy;
     }
     endDrag(e);
   });
