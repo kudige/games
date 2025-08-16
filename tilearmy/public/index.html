@@ -13,7 +13,7 @@
     #mapWrap{position:relative}
     #game{display:block;width:100%;height:100%;border-radius:16px;background:#0e1433;box-shadow:0 8px 30px rgba(0,0,0,.35)}
     #cursorInfo{position:absolute;bottom:6px;left:6px;background:#222951;color:#b8c1ff;padding:3px 8px;border-radius:12px;font-size:12px;pointer-events:none}
-    #dirArrow{position:absolute;font-size:10px;color:var(--accent);transform-origin:50% 50%;pointer-events:none;display:none}
+    #dirDot{position:absolute;width:6px;height:6px;border-radius:50%;background:var(--accent);pointer-events:none;display:none}
     #panel{background:var(--panel);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
     #panel h2{font-size:14px;margin:0 0 4px 0;color:var(--muted)}
     #bases,#vehicles,#bookmarks{display:grid;grid-template-columns:1fr;gap:6px;align-content:start;overflow:auto}
@@ -45,7 +45,7 @@
     <div id="mapWrap">
       <canvas id="game"></canvas>
       <div id="cursorInfo"></div>
-      <div id="dirArrow">▲</div>
+      <div id="dirDot"></div>
     </div>
     <aside id="panel">
       <h2>Your Bases</h2>
