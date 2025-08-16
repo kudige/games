@@ -22,6 +22,21 @@
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
   ctx.imageSmoothingEnabled = false;
+
+  // create a simple grass texture pattern for the map background
+  const grassPattern = (() => {
+    const p = document.createElement('canvas');
+    const size = 64;
+    p.width = p.height = size;
+    const g = p.getContext('2d');
+    g.fillStyle = '#3a5e2f';
+    g.fillRect(0, 0, size, size);
+    g.fillStyle = '#4d7c2a';
+    for (let i = 0; i < 200; i++) {
+      g.fillRect(Math.random() * size, Math.random() * size, 1, 1);
+    }
+    return ctx.createPattern(p, 'repeat');
+  })();
   const basesDiv = document.getElementById('bases');
   const vehiclesDiv = document.getElementById('vehicles');
   const bookmarksDiv = document.getElementById('bookmarks');
@@ -638,6 +653,25 @@
     for (const id in renderVehicles){ if (!seen.has(id)) delete renderVehicles[id]; }
   }
 
+  function drawBackground(){
+    ctx.save();
+    ctx.translate(-camera.x * camera.scale, -camera.y * camera.scale);
+    ctx.scale(camera.scale, camera.scale);
+    if (grassPattern){
+      const size = 64;
+      ctx.fillStyle = grassPattern;
+      const x0 = Math.floor(camera.x / size) * size;
+      const y0 = Math.floor(camera.y / size) * size;
+      const w = canvas.width / camera.scale + size;
+      const h = canvas.height / camera.scale + size;
+      ctx.fillRect(x0, y0, w, h);
+    } else {
+      ctx.fillStyle = '#3a5e2f';
+      ctx.fillRect(camera.x, camera.y, canvas.width / camera.scale, canvas.height / camera.scale);
+    }
+    ctx.restore();
+  }
+
   function drawGrid(){
     ctx.save();
     ctx.translate(-camera.x * camera.scale, -camera.y * camera.scale);
@@ -811,6 +845,7 @@
     smoothVehiclePositions();
     handleCombat();
     updateBullets(dt);
+    drawBackground();
     drawGrid();
     drawResources();
     drawBases();
