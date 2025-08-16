@@ -150,7 +150,7 @@ wss.on('connection', (ws) => {
     bases: [base.id],
     vehicles: [],
     color: `hsl(${Math.floor(rand(0,360))} 70% 55%)`,
-    ore: 800, // start with some ore
+    ore: 2000, // start with some ore
     lumber: 0,
     stone: 0,
     energy: CFG.ENERGY_MAX
