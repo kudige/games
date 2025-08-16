@@ -49,7 +49,6 @@
   const vehicleDropdown = document.getElementById('vehicleDropdown');
   const vehicleDropBtn = document.getElementById('vehicleDropBtn');
   const vehicleOptions = document.getElementById('vehicleOptions');
-  let selectedVType = '';
   const cursorInfo = document.getElementById('cursorInfo');
   const dirDot = document.getElementById('dirDot');
   const addBookmarkBtn = document.getElementById('addBookmark');
@@ -268,12 +267,11 @@
   }
 
   function updateSpawnControls(){
-    if (!vehicleDropdown || !document.getElementById('spawn')) return;
+    if (!vehicleDropdown) return;
     const base = selected && selected.type==='base' ? getBase(selected.id) : null;
     const show = base && base.owner === myId;
     vehicleDropdown.style.display = show ? '' : 'none';
     if (!show) vehicleOptions.classList.remove('show');
-    document.getElementById('spawn').style.display = show ? '' : 'none';
     if (show) refreshVehicleTypes(base); else refreshVehicleTypes(null);
     if (upgradeBtn){
       if (show){
@@ -292,7 +290,6 @@
     const key = allowed.join(',');
     if (refreshVehicleTypes._lastKey === key) return;
     refreshVehicleTypes._lastKey = key;
-    const prev = selectedVType;
     vehicleOptions.innerHTML = '';
     allowed.forEach(t => {
       const vt = types[t];
@@ -312,15 +309,14 @@
         opt.appendChild(name);
         opt.appendChild(cost);
         opt.onclick = () => {
-          selectedVType = t;
-          vehicleDropBtn.textContent = t;
           vehicleOptions.classList.remove('show');
+          if (!selected || selected.type !== 'base') return;
+          ws.send(JSON.stringify({ type: 'spawnVehicle', vType: t, baseId: selected.id }));
         };
         vehicleOptions.appendChild(opt);
       }
     });
-    if (allowed.includes(prev)) selectedVType = prev; else selectedVType = allowed[0] || '';
-    vehicleDropBtn.textContent = selectedVType || 'Select Vehicle';
+    vehicleDropBtn.textContent = 'Spawn Vehicle';
   }
 
   function allowedVehicles(level){
@@ -366,11 +362,6 @@
     }
   };
 
-  document.getElementById('spawn').onclick = () => {
-    if (!selected || selected.type !== 'base') return;
-    const vType = selectedVType;
-    ws.send(JSON.stringify({ type: 'spawnVehicle', vType, baseId: selected.id }));
-  };
   if (upgradeBtn){
     upgradeBtn.onclick = () => {
       if (!selected || selected.type !== 'base') return;
