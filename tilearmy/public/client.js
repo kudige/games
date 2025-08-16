@@ -115,7 +115,6 @@
   const fireTimers = Object.create(null);
   const bookmarks = [];
   let bookmarkMode = false;
-  const VEHICLE_OFFSETS = { scout: Math.PI/2 };
   const getBase = id => state.bases.find(b=>b.id===id);
   const findBaseAt = (x, y) => state.bases.find(b => Math.hypot(b.x - x, b.y - y) <= (cfg.BASE_ICON_SIZE/2));
   function findVehicleAt(x, y){
@@ -731,10 +730,9 @@
         let ang = rv.angle || 0;
         let flip = false;
         if (ang > Math.PI/2 || ang < -Math.PI/2){ flip = true; }
-        const offset = VEHICLE_OFFSETS[v.type] || 0;
         ctx.save();
         ctx.translate(vx, vy);
-        ctx.rotate(ang + offset);
+        ctx.rotate(ang);
         if (flip) ctx.scale(1,-1);
         ctx.drawImage(img, -size/2, -size/2, size, size);
         ctx.restore();
