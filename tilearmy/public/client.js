@@ -195,7 +195,20 @@
       const btn = document.createElement('button');
       btn.textContent = (b.name || b.id) + ` (Lv${b.level || 1})`;
       if (selected && selected.type==='base' && selected.id === b.id) btn.classList.add('selected');
-      btn.onclick = () => { selected = {type:'base', id:b.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
+      let clickTimer = null;
+      btn.addEventListener('click', () => {
+        if (clickTimer) clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => {
+          selected = {type:'base', id:b.id};
+          rebuildDashboard(); updateCursorInfo(); updateSpawnControls();
+          clickTimer = null;
+        }, 250);
+      });
+      btn.addEventListener('dblclick', () => {
+        if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+        camera.follow = false;
+        focusOn(b.x, b.y, true);
+      });
       basesDiv.appendChild(btn);
     });
 
@@ -661,7 +674,20 @@
         rv.y += (v.y - rv.y) * smooth;
         const dx = rv.x - rv.lastX;
         const dy = rv.y - rv.lastY;
-        if (Math.hypot(dx, dy) > 0.001) rv.angle = Math.atan2(dy, dx);
+        if (Math.hypot(dx, dy) > 0.001){
+          rv.angle = Math.atan2(dy, dx);
+        } else {
+          const bases = state.bases.filter(b=>b.owner===pid);
+          if (bases.length){
+            let nearest = bases[0];
+            let best = Math.hypot(nearest.x - v.x, nearest.y - v.y);
+            for (const b of bases){
+              const d = Math.hypot(b.x - v.x, b.y - v.y);
+              if (d < best){ best = d; nearest = b; }
+            }
+            rv.angle = nearest.x >= v.x ? 0 : Math.PI;
+          }
+        }
         seen.add(v.id);
       }
     }
