@@ -48,6 +48,7 @@
   const toast = document.getElementById('toast');
   const vTypeSel = document.getElementById('vehicleType');
   const cursorInfo = document.getElementById('cursorInfo');
+  const dirDot = document.getElementById('dirDot');
   const addBookmarkBtn = document.getElementById('addBookmark');
   const upgradeBtn = document.getElementById('upgradeBase');
 
@@ -352,6 +353,7 @@
       if (vInfo){ text += ` | ${vInfo.pid}`; }
     }
     const me = state.players[myId];
+    let showDot = false;
     if (me){
       let ox, oy;
       if (selected && selected.type === 'base'){
@@ -364,8 +366,32 @@
       if (ox !== undefined){
         const d = Math.hypot(w.x - ox, w.y - oy) / tile;
         text += ` | ${Math.floor(d)}`;
+        if (dirDot){
+          const ang = Math.atan2(oy - w.y, ox - w.x);
+          const infoRect = cursorInfo.getBoundingClientRect();
+          const wrapRect = mapWrap.getBoundingClientRect();
+          const cx = infoRect.left - wrapRect.left + infoRect.width/2;
+          const cy = infoRect.top - wrapRect.top + infoRect.height/2;
+          const dx = Math.cos(ang);
+          const dy = Math.sin(ang);
+          const halfW = infoRect.width / 2;
+          const halfH = infoRect.height / 2;
+          const tx = dx === 0 ? Infinity : halfW / Math.abs(dx);
+          const ty = dy === 0 ? Infinity : halfH / Math.abs(dy);
+          const t = Math.min(tx, ty);
+          const margin = 4;
+          const xPos = cx + dx * (t + margin);
+          const yPos = cy + dy * (t + margin);
+          const aw = dirDot.offsetWidth || 10;
+          const ah = dirDot.offsetHeight || 10;
+          dirDot.style.left = (xPos - aw/2) + 'px';
+          dirDot.style.top = (yPos - ah/2) + 'px';
+          dirDot.style.display = 'block';
+          showDot = true;
+        }
       }
     }
+    if (dirDot && !showDot) dirDot.style.display = 'none';
     cursorInfo.textContent = text;
   }
   function zoom(factor){
