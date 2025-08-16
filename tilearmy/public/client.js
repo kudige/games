@@ -49,6 +49,7 @@
   const vTypeSel = document.getElementById('vehicleType');
   const cursorInfo = document.getElementById('cursorInfo');
   const addBookmarkBtn = document.getElementById('addBookmark');
+  const upgradeBtn = document.getElementById('upgradeBase');
 
   // Load individual SVG icons and prepare helpers
   async function loadIconSheet(size){
@@ -192,7 +193,7 @@
     const myBases = state.bases.filter(b=>b.owner===myId);
     myBases.forEach(b => {
       const btn = document.createElement('button');
-      btn.textContent = b.name || b.id;
+      btn.textContent = (b.name || b.id) + ` (Lv${b.level || 1})`;
       if (selected && selected.type==='base' && selected.id === b.id) btn.classList.add('selected');
       btn.onclick = () => { selected = {type:'base', id:b.id}; rebuildDashboard(); updateCursorInfo(); updateSpawnControls(); };
       basesDiv.appendChild(btn);
@@ -262,6 +263,14 @@
     const show = base && base.owner === myId;
     vTypeSel.style.display = show ? '' : 'none';
     document.getElementById('spawn').style.display = show ? '' : 'none';
+    if (upgradeBtn){
+      if (show){
+        const lvl = base.level || 1;
+        const cost = { lumber: 200 * lvl, stone: 150 * lvl };
+        upgradeBtn.textContent = `Upgrade Base (-${cost.lumber} lumber, -${cost.stone} stone)`;
+      }
+      upgradeBtn.style.display = show ? '' : 'none';
+    }
   }
 
   function refreshVehicleTypes(){
@@ -314,6 +323,12 @@
     const vType = vTypeSel ? vTypeSel.value : undefined;
     ws.send(JSON.stringify({ type: 'spawnVehicle', vType, baseId: selected.id }));
   };
+  if (upgradeBtn){
+    upgradeBtn.onclick = () => {
+      if (!selected || selected.type !== 'base') return;
+      ws.send(JSON.stringify({ type: 'upgradeBase', baseId: selected.id }));
+    };
+  }
   function toWorld(px,py){
     return { x: px / camera.scale + camera.x, y: py / camera.scale + camera.y };
   }
@@ -712,6 +727,20 @@
       const by = (b.y - camera.y) * camera.scale;
       ctx.drawImage(tImgs.base, bx - baseSize/2, by - baseSize/2, baseSize, baseSize);
 
+      if (b.level){
+        const txt = String(b.level);
+        ctx.font = `${10 * camera.scale}px sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 3 * camera.scale;
+        ctx.strokeStyle = '#000';
+        ctx.fillStyle = '#fff';
+        const tx = bx + baseSize/2 - 2 * camera.scale;
+        const ty = by + baseSize/2 - 2 * camera.scale;
+        ctx.strokeText(txt, tx, ty);
+        ctx.fillText(txt, tx, ty);
+      }
+
       if (b.queue && b.queue.length){
         const item = b.queue[0];
         const vt = state.cfg.VEHICLE_TYPES[item.vType] || state.cfg.VEHICLE_TYPES.basic || {};
@@ -733,7 +762,8 @@
         }
       }
 
-      const maxHp = b.owner ? (state.cfg.BASE_HP || 1) : (state.cfg.NEUTRAL_BASE_HP || 1);
+      const baseHp = b.owner ? (state.cfg.BASE_HP || 1) : (state.cfg.NEUTRAL_BASE_HP || 1);
+      const maxHp = baseHp + ((b.level||1) - 1) * 100;
       const hpFrac = (b.hp || 0) / maxHp;
       if (hpFrac < 1){
         const W = baseSize;
