@@ -53,8 +53,12 @@
   const dirDot = document.getElementById('dirDot');
   const addBookmarkBtn = document.getElementById('addBookmark');
   const upgradeBtn = document.getElementById('upgradeBase');
+  const tutorialEl = document.getElementById('tutorial');
+  let tutorialActive = false;
+  function showTutorial(text){ if (tutorialEl){ tutorialEl.textContent = text; tutorialEl.style.display = 'flex'; } }
+  function hideTutorial(){ if (tutorialEl){ tutorialEl.style.display = 'none'; } }
   if (vehicleDropBtn){
-    vehicleDropBtn.onclick = () => vehicleOptions.classList.toggle('show');
+    vehicleDropBtn.onclick = () => { if (tutorialActive) return; vehicleDropBtn.classList.remove('selected'); vehicleOptions.classList.toggle('show'); };
     window.addEventListener('click', e => {
       if (!vehicleDropdown.contains(e.target)) vehicleOptions.classList.remove('show');
     });
@@ -328,6 +332,47 @@
     return allowed;
   }
 
+  function animateCamera(tx, ty, tz, duration, cb){
+    const sx = camera.x, sy = camera.y, sz = camera.scale;
+    const start = performance.now();
+    function step(now){
+      const t = Math.min(1, (now - start) / duration);
+      camera.x = sx + (tx - sx) * t;
+      camera.y = sy + (ty - sy) * t;
+      camera.scale = sz + (tz - sz) * t;
+      camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+      camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
+      if (t < 1) requestAnimationFrame(step); else if (cb) cb();
+    }
+    requestAnimationFrame(step);
+  }
+
+  function runTutorial(base){
+    if (!base) return;
+    tutorialActive = true;
+    camera.follow = false;
+    camera.x = 0; camera.y = 0; camera.scale = 1;
+    const zoomScale = 2;
+    const zoomX = base.x - (canvas.width / zoomScale)/2;
+    const zoomY = base.y - (canvas.height / zoomScale)/2;
+    const normScale = 1;
+    const normX = base.x - (canvas.width / normScale)/2;
+    const normY = base.y - (canvas.height / normScale)/2;
+    showTutorial('Welcome to the Tile Army');
+    animateCamera(zoomX, zoomY, zoomScale, 4000, () => {
+      showTutorial('This is your home base. Here you can build your army. But first you have to collect some resources. Lets create a vehicle first');
+      setTimeout(() => {
+        animateCamera(normX, normY, normScale, 1500, () => {
+          hideTutorial();
+          tutorialActive = false;
+          camera.follow = true;
+          if (vehicleDropBtn) vehicleDropBtn.classList.add('selected');
+        });
+      }, 2500);
+    });
+    localStorage.setItem('taTutorial', '1');
+  }
+
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'init') {
@@ -345,6 +390,9 @@
       rebuildDashboard();
       updateCursorInfo();
       updateSpawnControls();
+      if (!localStorage.getItem('taTutorial') && myBases.length){
+        runTutorial(myBases[0]);
+      }
     } else if (msg.type === 'state') {
       state = msg.state || state;
       const p = state.players[myId] || {};
@@ -444,6 +492,7 @@
   }
 
   window.addEventListener('keydown', (e) => {
+    if (tutorialActive){ e.preventDefault(); return; }
     const k = e.key.toLowerCase();
     const map = { arrowup:'w', arrowdown:'s', arrowleft:'a', arrowright:'d' };
     if (['w','a','s','d'].includes(k) || map[k]) {
@@ -480,6 +529,7 @@
     }
   });
   window.addEventListener('keyup', (e) => {
+    if (tutorialActive) return;
     const k = e.key.toLowerCase();
     const map = { arrowup:'w', arrowdown:'s', arrowleft:'a', arrowright:'d' };
     const mk = map[k] || k;
@@ -573,6 +623,7 @@
   }
 
   canvas.addEventListener('pointerdown', (e) => {
+    if (tutorialActive){ e.preventDefault(); return; }
     const r = canvas.getBoundingClientRect();
     mousePx = (e.clientX - r.left) * (canvas.width / r.width);
     mousePy = (e.clientY - r.top) * (canvas.height / r.height);
@@ -589,6 +640,7 @@
   });
 
   canvas.addEventListener('pointermove', (e) => {
+    if (tutorialActive){ return; }
     const r = canvas.getBoundingClientRect();
     mousePx = (e.clientX - r.left) * (canvas.width / r.width);
     mousePy = (e.clientY - r.top) * (canvas.height / r.height);
@@ -618,6 +670,7 @@
     if (canvas.releasePointerCapture && e.pointerId !== undefined) canvas.releasePointerCapture(e.pointerId);
   }
   canvas.addEventListener('pointerup', (e) => {
+    if (tutorialActive){ endDrag(e); return; }
     if (!tapMoved){
       const r = canvas.getBoundingClientRect();
       const sx = (e.clientX - r.left) * (canvas.width / r.width);
