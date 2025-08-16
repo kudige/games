@@ -37,6 +37,7 @@ const CFG = {
   HARVEST_RATE: 40,          // units/sec
   ENERGY_MAX: 100,           // player energy cap
   ENERGY_RECHARGE: 15,       // energy/sec auto recharge
+  OFFLINE_TIMEOUT: parseInt(process.env.OFFLINE_TIMEOUT_MS, 10) || 2 * 60 * 1000, // ms before offline players dock
   UNLOAD_TIME: 1000,         // ms to unload at base
   BASE_ATTACK_RANGE: 150,
   BASE_HP: 200,
@@ -175,10 +176,14 @@ wss.on('connection', (ws, req) => {
       ore: 2000, // start with some ore
       lumber: 0,
       stone: 0,
-      energy: CFG.ENERGY_MAX
+      energy: CFG.ENERGY_MAX,
+      disconnectedAt: null,
+      offline: false
     };
   }
 
+  players[id].disconnectedAt = null;
+  players[id].offline = false;
   connections[id] = ws;
 
   ws.send(JSON.stringify({ type: 'init', id, state: snapshotState() }));
@@ -226,6 +231,7 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => {
     // Keep player state so they can reconnect later; just remove the socket
     if (connections[id] === ws) delete connections[id];
+    if (players[id]) players[id].disconnectedAt = Date.now();
   });
 });
 
@@ -310,11 +316,29 @@ function gameLoop(){
 
   for (const pid in players){
     const pl = players[pid];
+    if (pl.disconnectedAt && now - pl.disconnectedAt >= CFG.OFFLINE_TIMEOUT) {
+      pl.offline = true;
+    }
+
     let energySpent = 0;
 
     for (const v of pl.vehicles){
+      if (pl.offline){
+        const b = nearestBase(pl, v.x, v.y);
+        if (b){
+          const dist = Math.hypot(b.x - v.x, b.y - v.y);
+          if (dist > 30 && v.state !== 'returning' && v.state !== 'unloading'){
+            v.state = 'returning';
+            v.targetRes = null;
+            v.tx = b.x;
+            v.ty = b.y;
+            v.targetBase = b.id;
+          }
+        }
+      }
+
       // Auto-target resources
-      if (v.capacity > 0 && v.state === 'idle' && v.carrying < v.capacity){
+      if (!pl.offline && v.capacity > 0 && v.state === 'idle' && v.carrying < v.capacity){
         if (!v.targetRes || !resources.find(r => r.id===v.targetRes && r.amount>0)){
           let best=null, bd=Infinity;
           const consider = (type, radius) => {
@@ -453,4 +477,4 @@ if (process.env.NODE_ENV !== 'test'){
   server.listen(PORT, () => console.log(`TileArmy server running: http://localhost:${PORT}`));
 }
 
-module.exports = { CFG, players, bases, processManufacturing, resolveCaptures, gameLoop };
+module.exports = { CFG, players, bases, resources, processManufacturing, resolveCaptures, gameLoop };
