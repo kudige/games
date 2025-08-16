@@ -353,12 +353,9 @@
     if (keys[mk]) delete keys[mk];
   });
 
-  canvas.addEventListener('click', (e) => {
-    const r = canvas.getBoundingClientRect();
-    const sx = (e.clientX - r.left) * (canvas.width / r.width);
-    const sy = (e.clientY - r.top) * (canvas.height / r.height);
+  function handleMapClick(sx, sy, shift){
     const w = toWorld(sx, sy);
-    if (e.shiftKey || bookmarkMode){
+    if (shift || bookmarkMode){
       const bm = { x: w.x, y: w.y };
       const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
       if (baseHit){
@@ -386,8 +383,7 @@
       bookmarks.push(bm);
       rebuildDashboard();
       bookmarkMode = false;
-      e.preventDefault();
-      return;
+      return true; // consumed; prevent default
     }
     const baseHit = state.bases.find(b => Math.hypot(b.x - w.x, b.y - w.y) <= (cfg.BASE_ICON_SIZE/2));
     if (baseHit){
@@ -395,15 +391,25 @@
       rebuildDashboard();
       updateSpawnControls();
       updateCursorInfo();
-      return;
+      return false;
     }
-    if (!selected || selected.type !== 'vehicle') return;
+    if (!selected || selected.type !== 'vehicle') return false;
     const rr = state.cfg.RESOURCE_RADIUS || 22;
     const res = state.resources.find(res => Math.hypot(res.x - w.x, res.y - w.y) <= rr);
     if (res) {
       ws.send(JSON.stringify({ type: 'harvestResource', vehicleId: selected.id, resourceId: res.id }));
     } else {
       ws.send(JSON.stringify({ type: 'moveVehicle', vehicleId: selected.id, x: w.x, y: w.y }));
+    }
+    return false;
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const r = canvas.getBoundingClientRect();
+    const sx = (e.clientX - r.left) * (canvas.width / r.width);
+    const sy = (e.clientY - r.top) * (canvas.height / r.height);
+    if (handleMapClick(sx, sy, e.shiftKey)){
+      e.preventDefault();
     }
   });
 
@@ -466,7 +472,16 @@
     e.preventDefault();
   }, { passive: false });
 
-  canvas.addEventListener('touchend', () => { dragging = false; });
+  canvas.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    if (t && bookmarkMode){
+      const r = canvas.getBoundingClientRect();
+      const sx = (t.clientX - r.left) * (canvas.width / r.width);
+      const sy = (t.clientY - r.top) * (canvas.height / r.height);
+      if (handleMapClick(sx, sy, false)) e.preventDefault();
+    }
+    dragging = false;
+  }, { passive: false });
   canvas.addEventListener('touchcancel', () => { dragging = false; });
 
   function endDrag(e){
