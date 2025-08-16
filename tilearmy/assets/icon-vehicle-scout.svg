@@ -18,15 +18,17 @@
     .fill-glass{fill:var(--glass)}
     .no-fill{fill:none}
   </style>
-  <!-- body -->
-  <path class="stroke fill-team" d="M24 44 L32 18 L40 44 Z"/>
-  <!-- cockpit window -->
-  <polygon class="stroke fill-glass" points="32 22, 36 36, 28 36"/>
-  <!-- wheels -->
-  <circle class="stroke" cx="22" cy="46" r="4" fill="#111827"/>
-  <circle class="stroke" cx="42" cy="46" r="4" fill="#111827"/>
-  <!-- antenna -->
-  <path class="stroke" d="M32 18 L32 12"/>
-  <circle class="stroke fill-accent" cx="32" cy="11" r="1.8"/>
+  <g transform="rotate(90 32 32)">
+    <!-- body -->
+    <path class="stroke fill-team" d="M24 44 L32 18 L40 44 Z"/>
+    <!-- cockpit window -->
+    <polygon class="stroke fill-glass" points="32 22, 36 36, 28 36"/>
+    <!-- wheels -->
+    <circle class="stroke" cx="22" cy="46" r="4" fill="#111827"/>
+    <circle class="stroke" cx="42" cy="46" r="4" fill="#111827"/>
+    <!-- antenna -->
+    <path class="stroke" d="M32 18 L32 12"/>
+    <circle class="stroke fill-accent" cx="32" cy="11" r="1.8"/>
+  </g>
 </svg>
 
