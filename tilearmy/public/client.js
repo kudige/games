@@ -46,11 +46,20 @@
   const stoneEl = document.getElementById('stoneCount');
   const energyFill = document.getElementById('energyFill');
   const toast = document.getElementById('toast');
-  const vTypeSel = document.getElementById('vehicleType');
+  const vehicleDropdown = document.getElementById('vehicleDropdown');
+  const vehicleDropBtn = document.getElementById('vehicleDropBtn');
+  const vehicleOptions = document.getElementById('vehicleOptions');
+  let selectedVType = '';
   const cursorInfo = document.getElementById('cursorInfo');
   const dirDot = document.getElementById('dirDot');
   const addBookmarkBtn = document.getElementById('addBookmark');
   const upgradeBtn = document.getElementById('upgradeBase');
+  if (vehicleDropBtn){
+    vehicleDropBtn.onclick = () => vehicleOptions.classList.toggle('show');
+    window.addEventListener('click', e => {
+      if (!vehicleDropdown.contains(e.target)) vehicleOptions.classList.remove('show');
+    });
+  }
 
   // Load individual SVG icons and prepare helpers
   async function loadIconSheet(size){
@@ -259,10 +268,11 @@
   }
 
   function updateSpawnControls(){
-    if (!vTypeSel || !document.getElementById('spawn')) return;
+    if (!vehicleDropdown || !document.getElementById('spawn')) return;
     const base = selected && selected.type==='base' ? getBase(selected.id) : null;
     const show = base && base.owner === myId;
-    vTypeSel.style.display = show ? '' : 'none';
+    vehicleDropdown.style.display = show ? '' : 'none';
+    if (!show) vehicleOptions.classList.remove('show');
     document.getElementById('spawn').style.display = show ? '' : 'none';
     if (show) refreshVehicleTypes(base); else refreshVehicleTypes(null);
     if (upgradeBtn){
@@ -276,23 +286,41 @@
   }
 
   function refreshVehicleTypes(base){
-    if (!vTypeSel) return;
+    if (!vehicleDropdown) return;
     const types = state.cfg.VEHICLE_TYPES || {};
     const allowed = base ? allowedVehicles(base.level || 1) : Object.keys(types);
     const key = allowed.join(',');
     if (refreshVehicleTypes._lastKey === key) return;
     refreshVehicleTypes._lastKey = key;
-    const prev = vTypeSel.value;
-    vTypeSel.innerHTML = '';
+    const prev = selectedVType;
+    vehicleOptions.innerHTML = '';
     allowed.forEach(t => {
-      if (types[t]){
-        const opt = document.createElement('option');
-        opt.value = t;
-        opt.textContent = t + ` (-${types[t].cost})`;
-        vTypeSel.appendChild(opt);
+      const vt = types[t];
+      if (vt){
+        const opt = document.createElement('div');
+        opt.className = 'option';
+        opt.dataset.type = t;
+        const name = document.createElement('span');
+        name.textContent = t;
+        const cost = document.createElement('span');
+        cost.className = 'cost';
+        const oreIcon = document.createElement('img');
+        oreIcon.src = images.ore.src;
+        oreIcon.className = 'resource-icon';
+        cost.appendChild(oreIcon);
+        cost.append(`-${vt.cost}`);
+        opt.appendChild(name);
+        opt.appendChild(cost);
+        opt.onclick = () => {
+          selectedVType = t;
+          vehicleDropBtn.textContent = t;
+          vehicleOptions.classList.remove('show');
+        };
+        vehicleOptions.appendChild(opt);
       }
     });
-    if (allowed.includes(prev)) vTypeSel.value = prev;
+    if (allowed.includes(prev)) selectedVType = prev; else selectedVType = allowed[0] || '';
+    vehicleDropBtn.textContent = selectedVType || 'Select Vehicle';
   }
 
   function allowedVehicles(level){
@@ -340,7 +368,7 @@
 
   document.getElementById('spawn').onclick = () => {
     if (!selected || selected.type !== 'base') return;
-    const vType = vTypeSel ? vTypeSel.value : undefined;
+    const vType = selectedVType;
     ws.send(JSON.stringify({ type: 'spawnVehicle', vType, baseId: selected.id }));
   };
   if (upgradeBtn){
