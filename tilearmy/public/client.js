@@ -667,12 +667,12 @@
         const vy = (rv.y - camera.y) * camera.scale;
         let ang = rv.angle || 0;
         let flip = false;
-        //if (ang > Math.PI/2 || ang < -Math.PI/2){ ang += Math.PI; flip = true; }
+        if (ang > Math.PI/2 || ang < -Math.PI/2){ flip = true; }
         const offset = VEHICLE_OFFSETS[v.type] || 0;
         ctx.save();
         ctx.translate(vx, vy);
-        //if (flip) ctx.scale(-1,1);
         ctx.rotate(ang + offset);
+        if (flip) ctx.scale(1,-1);
         ctx.drawImage(img, -size/2, -size/2, size, size);
         ctx.restore();
         const maxHp = (state.cfg.VEHICLE_TYPES[v.type]||{}).hp || 1;
