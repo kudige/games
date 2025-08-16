@@ -1,10 +1,11 @@
 process.env.NODE_ENV = 'test';
 const test = require('node:test');
 const assert = require('node:assert');
-const { CFG, players, bases, gameLoop } = require('../server');
+const { CFG, players, bases, resources, gameLoop } = require('../server');
 
 function resetState(){
   bases.length = 0;
+  resources.length = 0;
   for (const k of Object.keys(players)) delete players[k];
 }
 
