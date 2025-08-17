@@ -131,7 +131,14 @@ function seedResources(){
     for (let i=0;i<CFG.RESOURCE_COUNT;i++){
       const tx = Math.floor(rand(80, CFG.MAP_W - 80) / CFG.TILE_SIZE);
       const ty = Math.floor(rand(80, CFG.MAP_H - 80) / CFG.TILE_SIZE);
-      resources.push({ id: newId(6), type, x: tx * CFG.TILE_SIZE, y: ty * CFG.TILE_SIZE, amount: CFG.RESOURCE_AMOUNT });
+      resources.push({
+        id: newId(6),
+        type,
+        x: tx * CFG.TILE_SIZE,
+        y: ty * CFG.TILE_SIZE,
+        amount: CFG.RESOURCE_AMOUNT,
+        changed: true,
+      });
     }
   }
   seeded = true;
@@ -155,7 +162,7 @@ function spawnNeutralBases(count){
   }
 }
 
-function snapshotState(){
+function snapshotState(full = false){
   return {
     cfg: {
       MAP_W: CFG.MAP_W, MAP_H: CFG.MAP_H,
@@ -175,7 +182,7 @@ function snapshotState(){
       NEUTRAL_BASE_HP: CFG.NEUTRAL_BASE_HP,
       BASE_ATTACK_RANGE: CFG.BASE_ATTACK_RANGE
     },
-    resources,
+    resources: full ? resources : resources.filter(r => r.changed),
     players,
     bases
   };
@@ -246,7 +253,7 @@ wss.on('connection', (ws, req) => {
   players[id].offline = false;
   connections[id] = ws;
 
-  ws.send(JSON.stringify({ type: 'init', id, state: snapshotState() }));
+  ws.send(JSON.stringify({ type: 'init', id, state: snapshotState(true) }));
 
   ws.on('message', (raw) => {
     let msg; try { msg = JSON.parse(raw); } catch { return; }
@@ -457,7 +464,12 @@ function gameLoop(){
             if (d <= CFG.RESOURCE_RADIUS){
               v.state = 'harvesting';
               const take = Math.min(harvestStep, v.capacity - v.carrying, r.amount);
-              if (take > 0){ v.carryType = v.carryType || r.type; v.carrying += take; r.amount -= take; }
+              if (take > 0){
+                v.carryType = v.carryType || r.type;
+                v.carrying += take;
+                r.amount -= take;
+                r.changed = true;
+              }
               if (v.carrying >= v.capacity || r.amount <= 0){
                 const b = nearestBase(pl, v.x, v.y);
                 if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
@@ -509,9 +521,11 @@ function gameLoop(){
   // Capture bases
   resolveCaptures();
 
-  // Broadcast snapshot
-  const snap = JSON.stringify({ type: 'state', state: snapshotState() });
+  // Broadcast snapshot (only changed resources)
+  const state = snapshotState(false);
+  const snap = JSON.stringify({ type: 'state', state });
   for (const client of wss.clients){ if (client.readyState === WebSocket.OPEN) client.send(snap); }
+  for (const r of state.resources) r.changed = false;
 }
 
 if (process.env.NODE_ENV !== 'test'){
@@ -551,4 +565,5 @@ module.exports = {
   upgradeBase,
   baseUpgradeCost,
   spawnVehicle,
+  snapshotState,
 };
