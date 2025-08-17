@@ -133,15 +133,17 @@
   function showToast(text){ toast.textContent = text; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1500); }
 
   let myId = null;
-  let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:1000, VEHICLE_TYPES:{}, BASE_HP:200, NEUTRAL_BASE_HP:150, BASE_ATTACK_RANGE:150 } };
+  let state = { players:{}, entities:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:1000, VEHICLE_TYPES:{}, BASE_HP:200, NEUTRAL_BASE_HP:150, BASE_ATTACK_RANGE:150 } };
   let selected = null; // {type:'base'|'vehicle', id}
   const renderVehicles = {}; // smoothed positions and angles
   const bullets = [];
   const fireTimers = Object.create(null);
   const bookmarks = [];
   let bookmarkMode = false;
-  const getBase = id => state.bases.find(b=>b.id===id);
-  const findBaseAt = (x, y) => state.bases.find(b => Math.hypot(b.x - x, b.y - y) <= (cfg.BASE_ICON_SIZE/2));
+  const getBases = () => state.entities.filter(e => e.type === 'base');
+  const getResources = () => state.entities.filter(e => e.type === 'resource');
+  const getBase = id => getBases().find(b=>b.id===id);
+  const findBaseAt = (x, y) => getBases().find(b => Math.hypot(b.x - x, b.y - y) <= (cfg.BASE_ICON_SIZE/2));
   function findVehicleAt(x, y){
     for (const pid in state.players){
       const p = state.players[pid]; if (!p) continue;
@@ -199,7 +201,7 @@
     stoneEl.textContent = Math.floor(me.stone||0);
     const energy = me.energy||0; const pct = (state.cfg.ENERGY_MAX? (energy/state.cfg.ENERGY_MAX):0)*100; energyFill.style.width = pct + '%';
 
-    const myBases = state.bases.filter(b=>b.owner===myId);
+    const myBases = getBases().filter(b=>b.owner===myId);
     myBases.forEach(b => {
       const btn = document.createElement('button');
       btn.textContent = (b.name || b.id) + ` (Lv${b.level || 1})`;
@@ -244,7 +246,7 @@
           const tImgs = getTeamIcons(bm.entity.pid, p ? p.color : '#22c55e');
           img = v ? (tImgs[v.type] || tImgs.basic) : tImgs.basic;
         } else if (bm.entity.type === 'resource'){
-          const res = state.resources.find(r=>r.id===bm.entity.id);
+          const res = getResources().find(r=>r.id===bm.entity.id);
           img = res ? images[res.type] : images[bm.entity.resType || 'ore'];
         }
         if (img){
@@ -333,7 +335,7 @@
     if (msg.type === 'init') {
       myId = msg.id; state = msg.state || state; pidEl.textContent = 'Player ' + myId;
       localStorage.setItem('taName', myId);
-      const myBases = state.bases.filter(b=>b.owner===myId);
+      const myBases = getBases().filter(b=>b.owner===myId);
       if (myBases.length){
         selected = {type:'base', id: myBases[0].id};
         camera.x = myBases[0].x - (canvas.width / camera.scale)/2;
@@ -464,7 +466,7 @@
       }
       e.preventDefault();
     } else if (k === 'h') {
-      const myBases = state.bases.filter(b=>b.owner===myId);
+      const myBases = getBases().filter(b=>b.owner===myId);
       if (myBases.length){
         selected = {type:'base', id: myBases[0].id};
         rebuildDashboard();
@@ -501,7 +503,7 @@
           bm.entity = { type: 'vehicle', id: vInfo.vehicle.id, pid: vInfo.pid };
         } else {
           const rr = state.cfg.RESOURCE_RADIUS || 22;
-          const resHit = state.resources.find(r => Math.hypot(r.x - w.x, r.y - w.y) <= rr);
+          const resHit = getResources().find(r => Math.hypot(r.x - w.x, r.y - w.y) <= rr);
           if (resHit){
             bm.x = resHit.x; bm.y = resHit.y;
             bm.entity = { type: 'resource', id: resHit.id, resType: resHit.type };
@@ -540,7 +542,7 @@
     }
     if (!selected || selected.type !== 'vehicle') return false;
     const rr = state.cfg.RESOURCE_RADIUS || 22;
-    const res = state.resources.find(res => Math.hypot(res.x - w.x, res.y - w.y) <= rr);
+    const res = getResources().find(res => Math.hypot(res.x - w.x, res.y - w.y) <= rr);
     if (res) {
       ws.send(JSON.stringify({ type: 'harvestResource', vehicleId: selected.id, resourceId: res.id }));
     } else {
@@ -651,7 +653,7 @@
   function handleCombat(){
     const range = state.cfg.BASE_ATTACK_RANGE || 0;
     const now = performance.now() / 1000;
-    for (const b of state.bases){
+    for (const b of getBases()){
       for (const pid in state.players){
         if (b.owner && pid === b.owner) continue;
         const p = state.players[pid]; if (!p) continue;
@@ -672,7 +674,7 @@
       const p = state.players[pid]; if (!p) continue;
       for (const v of p.vehicles){
         if (!v.damage || !v.rof) continue;
-        for (const b of state.bases){
+        for (const b of getBases()){
           if (b.owner === pid) continue;
           const d = Math.hypot(b.x - v.x, b.y - v.y);
           if (d < range){
@@ -768,7 +770,7 @@
 
   function drawResources(){
     ctx.save();
-    for (const r of state.resources){
+    for (const r of getResources()){
       if (r.amount <= 0) continue;
       const img = images[r.type] || images.ore;
       const size = cfg.RESOURCE_ICON_SIZE;
@@ -783,7 +785,7 @@
 
   function drawBases(){
     ctx.save();
-    for (const b of state.bases){
+    for (const b of getBases()){
       const owner = b.owner ? state.players[b.owner] : null;
       const tImgs = getTeamIcons(b.owner || 'neutral', owner ? owner.color : '#999');
       const baseSize = cfg.BASE_ICON_SIZE;
