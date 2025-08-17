@@ -351,22 +351,24 @@
     return allowed;
   }
 
-  function animateCamera(tx, ty, tz, duration, cb){
-    const sx = camera.x, sy = camera.y, sz = camera.scale;
-    const start = performance.now();
-    function step(now){
-      const t = Math.min(1, (now - start) / duration);
-      camera.x = sx + (tx - sx) * t;
-      camera.y = sy + (ty - sy) * t;
-      camera.scale = sz + (tz - sz) * t;
-      camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
-      camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
-      if (t < 1) requestAnimationFrame(step); else if (cb) cb();
-    }
-    requestAnimationFrame(step);
+  function animateCamera(tx, ty, tz, duration){
+    return new Promise(res => {
+      const sx = camera.x, sy = camera.y, sz = camera.scale;
+      const start = performance.now();
+      function step(now){
+        const t = Math.min(1, (now - start) / duration);
+        camera.x = sx + (tx - sx) * t;
+        camera.y = sy + (ty - sy) * t;
+        camera.scale = sz + (tz - sz) * t;
+        camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+        camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
+        if (t < 1) requestAnimationFrame(step); else res();
+      }
+      requestAnimationFrame(step);
+    });
   }
 
-  function runTutorial(base){
+  async function runTutorial(base){
     if (!base) return;
     tutorialActive = true;
     camera.follow = false;
@@ -378,38 +380,29 @@
     const normX = base.x - (canvas.width / normScale)/2;
     const normY = base.y - (canvas.height / normScale)/2;
     showTutorial('Welcome to the Tile Army');
-    setTimeout(() => {
-      showTutorial('This is your home base.');
-      animateCamera(zoomX, zoomY, zoomScale, 3000, () => {
-        showTutorial('Here you will build your army and conquer the world');
-        setTimeout(() => {
-          animateCamera(normX, normY, normScale, 1500, () => {
-            showTutorial('But first lets create a vehicle to harvest resources');
-            setTimeout(() => {
-              if (vehicleDropBtn) vehicleDropBtn.classList.add('selected');
-              tutorialEl.textContent = 'Click here to create a scout vehicle';
-              tutorialEl.style.background = 'none';
-              tutorialEl.style.pointerEvents = 'none';
-              const mapRect = mapWrap.getBoundingClientRect();
-              const fromX = (base.x - camera.x) * camera.scale + mapRect.left;
-              const fromY = (base.y - camera.y) * camera.scale + mapRect.top;
-              const dropRect = vehicleDropBtn.getBoundingClientRect();
-              const toX = dropRect.left + dropRect.width/2;
-              const toY = dropRect.top + dropRect.height/2;
-              tutorialActive = false;
-              camera.follow = true;
-              moveArrow(fromX, fromY, toX, toY, 2000);
-              if (vehicleDropBtn){
-                vehicleDropBtn.addEventListener('click', () => {
-                  hideTutorial();
-                  if (tutorialArrow) tutorialArrow.style.display = 'none';
-                }, { once:true });
-              }
-            }, 2000);
-          });
-        }, 1000);
-      });
-    }, 1000);
+    await animateCamera(zoomX, zoomY, zoomScale, 3000);
+    showTutorial('This is your home base. Here you can build your army. But first you have to collect some resources. Lets create a vehicle first');
+    await new Promise(r=>setTimeout(r, 2000));
+    await animateCamera(normX, normY, normScale, 1500);
+    if (vehicleDropBtn) vehicleDropBtn.classList.add('selected');
+    tutorialEl.textContent = 'Click here to create a scout vehicle';
+    tutorialEl.style.background = 'none';
+    tutorialEl.style.pointerEvents = 'none';
+    const mapRect = mapWrap.getBoundingClientRect();
+    const fromX = (base.x - camera.x) * camera.scale + mapRect.left;
+    const fromY = (base.y - camera.y) * camera.scale + mapRect.top;
+    const dropRect = vehicleDropBtn.getBoundingClientRect();
+    const toX = dropRect.left + dropRect.width/2;
+    const toY = dropRect.top + dropRect.height/2;
+    tutorialActive = false;
+    camera.follow = true;
+    moveArrow(fromX, fromY, toX, toY, 2000);
+    if (vehicleDropBtn){
+      vehicleDropBtn.addEventListener('click', () => {
+        hideTutorial();
+        if (tutorialArrow) tutorialArrow.style.display = 'none';
+      }, { once:true });
+    }
     localStorage.setItem('taTutorial', '1');
   }
 
