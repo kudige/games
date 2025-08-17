@@ -247,7 +247,7 @@
           img = v ? (tImgs[v.type] || tImgs.basic) : tImgs.basic;
         } else if (bm.entity.type === 'resource'){
           const res = getResources().find(r=>r.id===bm.entity.id);
-          img = res ? images[res.type] : images[bm.entity.resType || 'ore'];
+          img = res ? images[res.resType] : images[bm.entity.resType || 'ore'];
         }
         if (img){
           const icon = img.cloneNode();
@@ -506,7 +506,7 @@
           const resHit = getResources().find(r => Math.hypot(r.x - w.x, r.y - w.y) <= rr);
           if (resHit){
             bm.x = resHit.x; bm.y = resHit.y;
-            bm.entity = { type: 'resource', id: resHit.id, resType: resHit.type };
+            bm.entity = { type: 'resource', id: resHit.id, resType: resHit.resType };
           }
         }
       }
@@ -772,7 +772,7 @@
     ctx.save();
     for (const r of getResources()){
       if (r.amount <= 0) continue;
-      const img = images[r.type] || images.ore;
+      const img = images[r.resType] || images.ore;
       const size = cfg.RESOURCE_ICON_SIZE;
       const sx = (r.x - camera.x) * camera.scale;
       const sy = (r.y - camera.y) * camera.scale;
