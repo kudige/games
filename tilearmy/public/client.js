@@ -53,8 +53,31 @@
   const dirDot = document.getElementById('dirDot');
   const addBookmarkBtn = document.getElementById('addBookmark');
   const upgradeBtn = document.getElementById('upgradeBase');
+  const tutorialEl = document.getElementById('tutorial');
+  const tutorialArrow = document.getElementById('tutorialArrow');
+  let tutorialActive = false;
+  function showTutorial(text){ if (tutorialEl){ tutorialEl.textContent = text; tutorialEl.style.display = 'flex'; tutorialEl.style.background = 'rgba(0,0,0,.6)'; tutorialEl.style.pointerEvents = 'auto'; } }
+  function hideTutorial(){ if (tutorialEl){ tutorialEl.style.display = 'none'; } }
+  function moveArrow(sx, sy, ex, ey, duration){
+    if (!tutorialArrow) return;
+    const angle = Math.atan2(ey - sy, ex - sx) * 180 / Math.PI + 90;
+    tutorialArrow.style.transform = `rotate(${angle}deg)`;
+    tutorialArrow.style.left = sx + 'px';
+    tutorialArrow.style.top = sy + 'px';
+    tutorialArrow.style.display = 'block';
+    const start = performance.now();
+    function step(now){
+      const t = Math.min((now - start) / duration, 1);
+      const x = sx + (ex - sx) * t;
+      const y = sy + (ey - sy) * t;
+      tutorialArrow.style.left = x + 'px';
+      tutorialArrow.style.top = y + 'px';
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
   if (vehicleDropBtn){
-    vehicleDropBtn.onclick = () => vehicleOptions.classList.toggle('show');
+    vehicleDropBtn.onclick = () => { if (tutorialActive) return; vehicleDropBtn.classList.remove('selected'); vehicleOptions.classList.toggle('show'); };
     window.addEventListener('click', e => {
       if (!vehicleDropdown.contains(e.target)) vehicleOptions.classList.remove('show');
     });
@@ -328,6 +351,61 @@
     return allowed;
   }
 
+  function animateCamera(tx, ty, tz, duration){
+    return new Promise(res => {
+      const sx = camera.x, sy = camera.y, sz = camera.scale;
+      const start = performance.now();
+      function step(now){
+        const t = Math.min(1, (now - start) / duration);
+        camera.x = sx + (tx - sx) * t;
+        camera.y = sy + (ty - sy) * t;
+        camera.scale = sz + (tz - sz) * t;
+        camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
+        camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
+        if (t < 1) requestAnimationFrame(step); else res();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  async function runTutorial(base){
+    if (!base) return;
+    tutorialActive = true;
+    camera.follow = false;
+    camera.x = 0; camera.y = 0; camera.scale = 1;
+    const zoomScale = 2;
+    const zoomX = base.x - (canvas.width / zoomScale)/2;
+    const zoomY = base.y - (canvas.height / zoomScale)/2;
+    const normScale = 1;
+    const normX = base.x - (canvas.width / normScale)/2;
+    const normY = base.y - (canvas.height / normScale)/2;
+    showTutorial('Welcome to the Tile Army');
+    await animateCamera(zoomX, zoomY, zoomScale, 3000);
+    showTutorial('This is your home base. Here you can build your army. But first you have to collect some resources. Lets create a vehicle first');
+    await new Promise(r=>setTimeout(r, 2000));
+    await animateCamera(normX, normY, normScale, 1500);
+    if (vehicleDropBtn) vehicleDropBtn.classList.add('selected');
+    tutorialEl.textContent = 'Click here to create a scout vehicle';
+    tutorialEl.style.background = 'none';
+    tutorialEl.style.pointerEvents = 'none';
+    const mapRect = mapWrap.getBoundingClientRect();
+    const fromX = (base.x - camera.x) * camera.scale + mapRect.left;
+    const fromY = (base.y - camera.y) * camera.scale + mapRect.top;
+    const dropRect = vehicleDropBtn.getBoundingClientRect();
+    const toX = dropRect.left + dropRect.width/2;
+    const toY = dropRect.top + dropRect.height/2;
+    tutorialActive = false;
+    camera.follow = true;
+    moveArrow(fromX, fromY, toX, toY, 2000);
+    if (vehicleDropBtn){
+      vehicleDropBtn.addEventListener('click', () => {
+        hideTutorial();
+        if (tutorialArrow) tutorialArrow.style.display = 'none';
+      }, { once:true });
+    }
+    localStorage.setItem('taTutorial', '1');
+  }
+
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'init') {
@@ -345,6 +423,9 @@
       rebuildDashboard();
       updateCursorInfo();
       updateSpawnControls();
+      if (!localStorage.getItem('taTutorial') && myBases.length){
+        runTutorial(myBases[0]);
+      }
     } else if (msg.type === 'state') {
       state = msg.state || state;
       const p = state.players[myId] || {};
@@ -444,6 +525,7 @@
   }
 
   window.addEventListener('keydown', (e) => {
+    if (tutorialActive){ e.preventDefault(); return; }
     const k = e.key.toLowerCase();
     const map = { arrowup:'w', arrowdown:'s', arrowleft:'a', arrowright:'d' };
     if (['w','a','s','d'].includes(k) || map[k]) {
@@ -480,6 +562,7 @@
     }
   });
   window.addEventListener('keyup', (e) => {
+    if (tutorialActive) return;
     const k = e.key.toLowerCase();
     const map = { arrowup:'w', arrowdown:'s', arrowleft:'a', arrowright:'d' };
     const mk = map[k] || k;
@@ -573,6 +656,7 @@
   }
 
   canvas.addEventListener('pointerdown', (e) => {
+    if (tutorialActive){ e.preventDefault(); return; }
     const r = canvas.getBoundingClientRect();
     mousePx = (e.clientX - r.left) * (canvas.width / r.width);
     mousePy = (e.clientY - r.top) * (canvas.height / r.height);
@@ -589,6 +673,7 @@
   });
 
   canvas.addEventListener('pointermove', (e) => {
+    if (tutorialActive){ return; }
     const r = canvas.getBoundingClientRect();
     mousePx = (e.clientX - r.left) * (canvas.width / r.width);
     mousePy = (e.clientY - r.top) * (canvas.height / r.height);
@@ -618,6 +703,7 @@
     if (canvas.releasePointerCapture && e.pointerId !== undefined) canvas.releasePointerCapture(e.pointerId);
   }
   canvas.addEventListener('pointerup', (e) => {
+    if (tutorialActive){ endDrag(e); return; }
     if (!tapMoved){
       const r = canvas.getBoundingClientRect();
       const sx = (e.clientX - r.left) * (canvas.width / r.width);
