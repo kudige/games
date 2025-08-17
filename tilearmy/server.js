@@ -70,8 +70,14 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const players = Object.create(null); // { id: { bases, vehicles, color, ore, lumber, stone, energy } }
-const resources = []; // [{id,type,x,y,amount}]
-const bases = []; // [{id,x,y,owner,hp,damage,rof,level,queue}]
+// Unified entity list. Each entity has {id,type,owner?,...}
+const entities = [];
+function getEntitiesByType(type){
+  return entities.filter(e => e.type === type);
+}
+function findEntity(id){
+  return entities.find(e => e.id === id);
+}
 const connections = Object.create(null); // playerId -> ws
 let seeded = false;
 
@@ -98,7 +104,7 @@ function applyBaseStats(base){
 
 function upgradeBase(playerId, baseId){
   const pl = players[playerId]; if (!pl) return false;
-  const b = bases.find(b => b.id === baseId && b.owner === playerId); if (!b) return false;
+  const b = getEntitiesByType('base').find(b => b.id === baseId && b.owner === playerId); if (!b) return false;
   const lvl = b.level || 1;
   const cost = baseUpgradeCost(lvl);
   if ((pl.lumber || 0) < cost.lumber || (pl.stone || 0) < cost.stone) return false;
@@ -111,7 +117,7 @@ function upgradeBase(playerId, baseId){
 
 function spawnVehicle(playerId, baseId, vType){
   const pl = players[playerId]; if (!pl) return { ok: false, msg: 'Player not found' };
-  const base = bases.find(b => b.id === baseId && b.owner === playerId); if (!base) return { ok: false, msg: 'Base not found' };
+  const base = getEntitiesByType('base').find(b => b.id === baseId && b.owner === playerId); if (!base) return { ok: false, msg: 'Base not found' };
   const lvl = base.level || 1;
   const allowed = vehiclesForBaseLevel(lvl);
   if (!allowed.includes(vType)) return { ok: false, msg: 'Vehicle not available at this base level' };
@@ -131,7 +137,7 @@ function seedResources(){
     for (let i=0;i<CFG.RESOURCE_COUNT;i++){
       const tx = Math.floor(rand(80, CFG.MAP_W - 80) / CFG.TILE_SIZE);
       const ty = Math.floor(rand(80, CFG.MAP_H - 80) / CFG.TILE_SIZE);
-      resources.push({ id: newId(6), type, x: tx * CFG.TILE_SIZE, y: ty * CFG.TILE_SIZE, amount: CFG.RESOURCE_AMOUNT });
+      entities.push({ id: newId(6), type: 'resource', resType: type, x: tx * CFG.TILE_SIZE, y: ty * CFG.TILE_SIZE, amount: CFG.RESOURCE_AMOUNT });
     }
   }
   seeded = true;
@@ -141,8 +147,9 @@ function spawnNeutralBases(count){
   for (let i=0;i<count;i++){
     const bx = Math.floor(rand(200, CFG.MAP_W - 200) / CFG.TILE_SIZE);
     const by = Math.floor(rand(200, CFG.MAP_H - 200) / CFG.TILE_SIZE);
-    bases.push({
+    entities.push({
       id: newId(6),
+      type: 'base',
       x: bx * CFG.TILE_SIZE,
       y: by * CFG.TILE_SIZE,
       owner: null,
@@ -175,16 +182,15 @@ function snapshotState(){
       NEUTRAL_BASE_HP: CFG.NEUTRAL_BASE_HP,
       BASE_ATTACK_RANGE: CFG.BASE_ATTACK_RANGE
     },
-    resources,
     players,
-    bases
+    entities
   };
 }
 
 function nearestBase(pl, x, y){
   let best=null, bd=Infinity;
   for (const id of pl.bases){
-    const b = bases.find(b => b.id === id);
+    const b = getEntitiesByType('base').find(b => b.id === id);
     if (!b) continue;
     const d = Math.hypot(b.x - x, b.y - y);
     if (d < bd){ bd=d; best=b; }
@@ -219,6 +225,7 @@ wss.on('connection', (ws, req) => {
     const by = Math.floor(rand(200, CFG.MAP_H - 200) / CFG.TILE_SIZE);
     const base = {
       id: newId(6),
+      type: 'base',
       x: bx * CFG.TILE_SIZE,
       y: by * CFG.TILE_SIZE,
       owner: id,
@@ -227,7 +234,7 @@ wss.on('connection', (ws, req) => {
       name: `${id} Home`
     };
     applyBaseStats(base);
-    bases.push(base);
+    entities.push(base);
     spawnNeutralBases(CFG.CROWD);
     players[id] = {
       bases: [base.id],
@@ -266,9 +273,9 @@ wss.on('connection', (ws, req) => {
     }
     else if (msg.type === 'harvestResource') {
       const v = me.vehicles.find(v => v.id === msg.vehicleId);
-      const r = resources.find(r => r.id === msg.resourceId);
+      const r = getEntitiesByType('resource').find(r => r.id === msg.resourceId);
       if (v && r && r.amount > 0) {
-        v.preferType = r.type;
+        v.preferType = r.resType;
         v.carrying = 0;
         v.carryType = null;
         v.targetRes = r.id;
@@ -297,7 +304,7 @@ function handleDisconnect(id, ws){
 
 // ------------------ SIMULATION ------------------
 function processManufacturing(now){
-  for (const b of bases){
+  for (const b of getEntitiesByType('base')){
     if (!b.queue) b.queue = [];
     while (b.queue.length && b.queue[0].readyAt <= now){
       const item = b.queue.shift();
@@ -331,7 +338,7 @@ function processManufacturing(now){
 }
 
 function resolveCaptures(){
-  for (const b of bases){
+  for (const b of getEntitiesByType('base')){
     if (b.hp <= 0 && b.lastAttacker){
       const prev = b.owner;
       const att = b.lastAttacker;
@@ -399,12 +406,12 @@ function gameLoop(){
 
       // Auto-target resources
       if (!pl.offline && v.capacity > 0 && v.state === 'idle' && v.carrying < v.capacity){
-        if (!v.targetRes || !resources.find(r => r.id===v.targetRes && r.amount>0)){
+        if (!v.targetRes || !getEntitiesByType('resource').find(r => r.id===v.targetRes && r.amount>0)){
           let best=null, bd=Infinity;
           const consider = (type, radius) => {
-            for (const r of resources){
+            for (const r of getEntitiesByType('resource')){
               if (r.amount<=0 || claimed.has(r.id)) continue;
-              if (type && r.type !== type) continue;
+              if (type && r.resType !== type) continue;
               const d=Math.hypot(r.x-v.x, r.y-v.y);
               if (radius !== undefined && d>radius) continue;
               if (d<bd){bd=d; best=r;}
@@ -426,7 +433,7 @@ function gameLoop(){
         energySpent += mv * (v.energyCost || 0);
       } else {
         if (v.state === 'returning' || v.state === 'unloading'){
-          const base = bases.find(b=>b.id===v.targetBase);
+          const base = getEntitiesByType('base').find(b=>b.id===v.targetBase);
           if (base && Math.hypot(v.x-base.x, v.y-base.y) < 30){
             if (v.state !== 'unloading'){
               v.state = 'unloading';
@@ -451,13 +458,13 @@ function gameLoop(){
             if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
           }
         } else if (v.targetRes){
-          const r = resources.find(r => r.id === v.targetRes);
+          const r = getEntitiesByType('resource').find(r => r.id === v.targetRes);
           if (r && r.amount > 0){
             const d = Math.hypot(r.x - v.x, r.y - v.y);
             if (d <= CFG.RESOURCE_RADIUS){
               v.state = 'harvesting';
               const take = Math.min(harvestStep, v.capacity - v.carrying, r.amount);
-              if (take > 0){ v.carryType = v.carryType || r.type; v.carrying += take; r.amount -= take; }
+              if (take > 0){ v.carryType = v.carryType || r.resType; v.carrying += take; r.amount -= take; }
               if (v.carrying >= v.capacity || r.amount <= 0){
                 const b = nearestBase(pl, v.x, v.y);
                 if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
@@ -470,7 +477,7 @@ function gameLoop(){
       }
 
       // Attack bases
-      for (const b of bases){
+      for (const b of getEntitiesByType('base')){
         if (b.owner === pid) continue;
         const d = Math.hypot(b.x - v.x, b.y - v.y);
         if (d < CFG.BASE_ATTACK_RANGE){
@@ -488,7 +495,7 @@ function gameLoop(){
   }
 
   // Bases attack vehicles
-  for (const b of bases){
+  for (const b of getEntitiesByType('base')){
     const dps = (b.damage||0) * (b.rof||0);
     for (const pid in players){
       if (b.owner && pid === b.owner) continue;
@@ -541,8 +548,7 @@ if (process.env.NODE_ENV !== 'test'){
 module.exports = {
   CFG,
   players,
-  bases,
-  resources,
+  entities,
   connections,
   processManufacturing,
   resolveCaptures,
@@ -551,4 +557,6 @@ module.exports = {
   upgradeBase,
   baseUpgradeCost,
   spawnVehicle,
+  getEntitiesByType,
+  findEntity,
 };

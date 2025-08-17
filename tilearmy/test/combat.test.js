@@ -1,11 +1,12 @@
 process.env.NODE_ENV = 'test';
 const test = require('node:test');
 const assert = require('node:assert');
-const { CFG, players, bases, resources, processManufacturing, resolveCaptures } = require('../server');
+const { CFG, players, entities, getEntitiesByType, processManufacturing, resolveCaptures } = require('../server');
+const bases = () => getEntitiesByType('base');
+const resources = () => getEntitiesByType('resource');
 
 function resetState(){
-  bases.length = 0;
-  resources.length = 0;
+  entities.length = 0;
   for (const k of Object.keys(players)) delete players[k];
 }
 
@@ -13,8 +14,8 @@ test('base captured after HP reaches zero', () => {
   resetState();
   players.attacker = { bases: ['h0'], vehicles: [] };
   players.defender = { bases: ['b1'], vehicles: [] };
-  const base = { id: 'b1', x: 0, y: 0, owner: 'defender', hp: 0, damage: CFG.NEUTRAL_BASE_DAMAGE, rof: CFG.NEUTRAL_BASE_ROF, queue: [], lastAttacker: 'attacker' };
-  bases.push(base);
+  const base = { id: 'b1', type: 'base', x: 0, y: 0, owner: 'defender', hp: 0, damage: CFG.NEUTRAL_BASE_DAMAGE, rof: CFG.NEUTRAL_BASE_ROF, queue: [], lastAttacker: 'attacker' };
+  entities.push(base);
 
   resolveCaptures();
 
@@ -29,8 +30,8 @@ test('manufacturing queue spawns vehicle when ready', () => {
   resetState();
   players.p1 = { bases: ['b1'], vehicles: [] };
   const now = Date.now();
-  const base = { id: 'b1', x: 0, y: 0, owner: 'p1', hp: CFG.BASE_HP, damage: CFG.BASE_DAMAGE, rof: CFG.BASE_ROF, queue: [{ vType: 'basic', readyAt: now - 1000 }] };
-  bases.push(base);
+  const base = { id: 'b1', type: 'base', x: 0, y: 0, owner: 'p1', hp: CFG.BASE_HP, damage: CFG.BASE_DAMAGE, rof: CFG.BASE_ROF, queue: [{ vType: 'basic', readyAt: now - 1000 }] };
+  entities.push(base);
 
   processManufacturing(now);
 
