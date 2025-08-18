@@ -181,6 +181,9 @@ function snapshotState(){
   };
 }
 
+let lastSnapshot = JSON.stringify(snapshotState());
+let lastSnapshotTime = Date.now();
+
 function nearestBase(pl, x, y){
   let best=null, bd=Infinity;
   for (const id of pl.bases){
@@ -509,9 +512,17 @@ function gameLoop(){
   // Capture bases
   resolveCaptures();
 
-  // Broadcast snapshot
-  const snap = JSON.stringify({ type: 'state', state: snapshotState() });
-  for (const client of wss.clients){ if (client.readyState === WebSocket.OPEN) client.send(snap); }
+  // Broadcast snapshot at most once per second and only on change
+  const state = snapshotState();
+  const stateStr = JSON.stringify(state);
+  if (stateStr !== lastSnapshot && now - lastSnapshotTime >= 1000) {
+    const snap = JSON.stringify({ type: 'state', state });
+    for (const client of wss.clients){
+      if (client.readyState === WebSocket.OPEN) client.send(snap);
+    }
+    lastSnapshot = stateStr;
+    lastSnapshotTime = now;
+  }
 }
 
 if (process.env.NODE_ENV !== 'test'){
@@ -551,4 +562,5 @@ module.exports = {
   upgradeBase,
   baseUpgradeCost,
   spawnVehicle,
+  wss,
 };
