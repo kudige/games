@@ -73,6 +73,7 @@ const players = Object.create(null); // { id: { bases, vehicles, color, ore, lum
 const resources = []; // [{id,type,x,y,amount}]
 const bases = []; // [{id,x,y,owner,hp,damage,rof,level,queue}]
 const connections = Object.create(null); // playerId -> ws
+const lastSeq = Object.create(null); // last processed input seq per player
 let seeded = false;
 
 function vehiclesForBaseLevel(level){
@@ -350,6 +351,7 @@ wss.on('connection', (ws, req) => {
   players[id].disconnectedAt = null;
   players[id].offline = false;
   connections[id] = ws;
+  ws.pid = id;
 
   ws.send(JSON.stringify({ type: 'init', id, state: snapshotState() }));
 
@@ -361,28 +363,30 @@ wss.on('connection', (ws, req) => {
       const res = spawnVehicle(id, msg.baseId, msg.vType || 'basic');
       ws.send(JSON.stringify({ type: 'notice', ok: res.ok, msg: res.msg }));
     }
-    else if (msg.type === 'moveVehicle') {
-      const v = me.vehicles.find(v => v.id === msg.vehicleId);
-      if (v) {
-        v.state = 'idle'; v.targetRes = null; // manual override
-        v.tx = clamp(msg.x, 0, CFG.MAP_W);
-        v.ty = clamp(msg.y, 0, CFG.MAP_H);
+      else if (msg.type === 'moveVehicle') {
+        const v = me.vehicles.find(v => v.id === msg.vehicleId);
+        if (v) {
+          v.state = 'idle'; v.targetRes = null; // manual override
+          v.tx = clamp(msg.x, 0, CFG.MAP_W);
+          v.ty = clamp(msg.y, 0, CFG.MAP_H);
+          if (typeof msg.seq === 'number') lastSeq[id] = msg.seq;
+        }
       }
-    }
-    else if (msg.type === 'harvestResource') {
-      const v = me.vehicles.find(v => v.id === msg.vehicleId);
-      const r = resources.find(r => r.id === msg.resourceId);
-      if (v && r && r.amount > 0) {
-        v.preferType = r.type;
-        v.carrying = 0;
-        v.carryType = null;
-        v.targetRes = r.id;
-        v.tx = r.x;
-        v.ty = r.y;
-        v.state = 'idle';
+      else if (msg.type === 'harvestResource') {
+        const v = me.vehicles.find(v => v.id === msg.vehicleId);
+        const r = resources.find(r => r.id === msg.resourceId);
+        if (v && r && r.amount > 0) {
+          v.preferType = r.type;
+          v.carrying = 0;
+          v.carryType = null;
+          v.targetRes = r.id;
+          v.tx = r.x;
+          v.ty = r.y;
+          v.state = 'idle';
+          if (typeof msg.seq === 'number') lastSeq[id] = msg.seq;
+        }
       }
-    }
-    else if (msg.type === 'upgradeBase') {
+      else if (msg.type === 'upgradeBase') {
       const ok = upgradeBase(id, msg.baseId);
       if (ok) ws.send(JSON.stringify({ type: 'notice', ok: true, msg: 'Base upgraded' }));
       else ws.send(JSON.stringify({ type: 'notice', ok: false, msg: 'Not enough resources to upgrade base' }));
@@ -618,9 +622,10 @@ function gameLoop(){
   const state = snapshotState();
   const changed = diffState(lastSnapshot, state);
   if (changed.length && now - lastSnapshotTime >= 1000) {
-    const snap = JSON.stringify({ type: 'update', entities: changed });
     for (const client of wss.clients) {
-      if (client.readyState === WebSocket.OPEN) client.send(snap);
+      if (client.readyState !== WebSocket.OPEN) continue;
+      const ack = lastSeq[client.pid] || 0;
+      client.send(JSON.stringify({ type: 'update', ack, entities: changed }));
     }
     lastSnapshot = JSON.parse(JSON.stringify(state));
     lastSnapshotTime = now;

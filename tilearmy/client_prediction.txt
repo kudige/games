@@ -1,0 +1,19 @@
+Client-side prediction in Tilearmy enables smooth movement and resource gathering feedback on the client by speculatively applying player commands before the server confirms them.
+
+1. **Sequenced inputs**
+   - Each move or harvest command is tagged with an incrementing `seq` number.
+   - Commands are added to `pendingInputs` and immediately sent to the server with their sequence number.
+
+2. **Local application**
+   - `sendMove` calls `applyLocalMove` to update the selected vehicle's target coordinates.
+   - `sendHarvest` calls `applyLocalHarvest` to direct the vehicle toward a resource and reset its cargo state.
+
+3. **Frame simulation**
+   - Every frame `predictMyVehicles` moves vehicles toward their targets using their speed and simulates harvesting and unloading.
+   - When a vehicle reaches a resource, it accumulates cargo up to its capacity, then chooses the nearest base to unload. During unloading the player's stockpile is updated locally.
+
+4. **Server reconciliation**
+   - Server update messages include `ack`, the highest processed `seq`.
+   - The client discards acknowledged inputs and reapplies any remaining `pendingInputs` to the authoritative state received from the server, correcting any divergence.
+
+This strategy keeps gameplay responsive while ensuring the server remains authoritative for final state.
