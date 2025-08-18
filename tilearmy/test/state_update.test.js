@@ -78,7 +78,7 @@ test('state updates are throttled and only send changed entities', () => {
     gameLoop();
     assert.strictEqual(messages.length, 4);
     const move = messages[3].entities.find(e => e.kind === 'vehicle' && e.id === 'v1');
-    assert.deepStrictEqual(Object.keys(move).sort(), ['id', 'kind', 'owner', 'x']);
+    assert.deepStrictEqual(Object.keys(move).sort(), ['fx', 'fy', 'id', 'kind', 'owner', 'vx', 'vy', 'x']);
     assert.strictEqual(move.x, 10);
   } finally {
     Date.now = realNow;
