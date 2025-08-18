@@ -195,6 +195,7 @@ function diffState(prev, curr) {
     return diff;
   };
 
+  // World resources
   const prevRes = Object.create(null);
   for (const r of prev.resources || []) prevRes[r.id] = r;
   const currRes = Object.create(null);
@@ -203,12 +204,13 @@ function diffState(prev, curr) {
     const r = currRes[id];
     const pr = prevRes[id];
     const diff = diffObj(pr, r);
-    diff.id = r.id;
-    if (Object.keys(diff).length > 1) changed.push({ kind: 'resource', ...diff });
+    delete diff.id;
+    if (Object.keys(diff).length) changed.push({ kind: 'resource', id: r.id, ...diff });
     delete prevRes[id];
   }
   for (const id in prevRes) changed.push({ kind: 'resource', id, removed: true });
 
+  // Bases
   const prevBases = Object.create(null);
   for (const b of prev.bases || []) prevBases[b.id] = b;
   const currBases = Object.create(null);
@@ -217,23 +219,66 @@ function diffState(prev, curr) {
     const b = currBases[id];
     const pb = prevBases[id];
     const diff = diffObj(pb, b);
-    diff.id = b.id;
-    if (Object.keys(diff).length > 1) changed.push({ kind: 'base', ...diff });
+    delete diff.id;
+    if (Object.keys(diff).length) changed.push({ kind: 'base', id: b.id, ...diff });
     delete prevBases[id];
   }
   for (const id in prevBases) changed.push({ kind: 'base', id, removed: true });
 
+  // Players -> split into metadata, resources, and vehicles
   const prevPlayers = { ...(prev.players || {}) };
   const currPlayers = curr.players || {};
+
+  const pickMeta = (p) => {
+    if (!p) return undefined;
+    const { ore, lumber, stone, energy, vehicles, ...meta } = p;
+    return meta;
+  };
+  const pickRes = (p) => {
+    if (!p) return undefined;
+    const { ore, lumber, stone, energy } = p;
+    return { ore, lumber, stone, energy };
+  };
+
   for (const id in currPlayers) {
     const p = currPlayers[id];
     const pp = prevPlayers[id];
-    const diff = diffObj(pp, p);
-    diff.id = id;
-    if (Object.keys(diff).length > 1) changed.push({ kind: 'player', ...diff });
+
+    // Player metadata
+    const metaDiff = diffObj(pickMeta(pp), pickMeta(p));
+    if (Object.keys(metaDiff).length) changed.push({ kind: 'player', id, ...metaDiff });
+
+    // Player resources
+    const resDiff = diffObj(pickRes(pp), pickRes(p));
+    if (Object.keys(resDiff).length) changed.push({ kind: 'resource', id, ...resDiff });
+
+    // Vehicles
+    const prevVeh = Object.create(null);
+    if (pp && pp.vehicles) for (const v of pp.vehicles) prevVeh[v.id] = v;
+    const currVeh = Object.create(null);
+    for (const v of p.vehicles || []) currVeh[v.id] = v;
+    for (const vid in currVeh) {
+      const cv = currVeh[vid];
+      const pv = prevVeh[vid];
+      const vDiff = diffObj(pv, cv);
+      delete vDiff.id;
+      if (Object.keys(vDiff).length) changed.push({ kind: 'vehicle', owner: id, id: vid, ...vDiff });
+      delete prevVeh[vid];
+    }
+    for (const vid in prevVeh) changed.push({ kind: 'vehicle', owner: id, id: vid, removed: true });
+
     delete prevPlayers[id];
   }
-  for (const id in prevPlayers) changed.push({ kind: 'player', id, removed: true });
+
+  // Removed players
+  for (const id in prevPlayers) {
+    const pp = prevPlayers[id];
+    changed.push({ kind: 'player', id, removed: true });
+    changed.push({ kind: 'resource', id, removed: true });
+    if (pp.vehicles) {
+      for (const v of pp.vehicles) changed.push({ kind: 'vehicle', owner: id, id: v.id, removed: true });
+    }
+  }
 
   return changed;
 }

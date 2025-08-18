@@ -40,6 +40,9 @@ test('state updates are throttled and only send changed entities', () => {
     assert.ok(Array.isArray(messages[0].entities));
     const pMsg = messages[0].entities.find(e => e.kind === 'player' && e.id === 'p1');
     assert.ok(pMsg);
+    assert.strictEqual(pMsg.ore, undefined);
+    const rMsg = messages[0].entities.find(e => e.kind === 'resource' && e.id === 'p1');
+    assert.ok(rMsg);
     assert.strictEqual(messages[0].cfg, undefined);
 
     // State changes again but within a second -> still only one broadcast
@@ -54,9 +57,29 @@ test('state updates are throttled and only send changed entities', () => {
     now = 2200;
     gameLoop();
     assert.strictEqual(messages.length, 2);
-    const update = messages[1].entities.find(e => e.kind === 'player' && e.id === 'p1');
+    const update = messages[1].entities.find(e => e.kind === 'resource' && e.id === 'p1');
     assert.deepStrictEqual(Object.keys(update).sort(), ['id', 'kind', 'ore']);
     assert.strictEqual(update.ore, 5);
+
+    // Add a vehicle and ensure updates are separate
+    players.p1.vehicles.push({ id: 'v1', x: 0, y: 0, tx: 0, ty: 0, type: 'basic', hp: 1, speed: 0, state: 'idle', capacity: 0, carrying: 0 });
+    now = 3200;
+    gameLoop();
+    assert.strictEqual(messages.length, 3);
+    const vMsg = messages[2].entities.find(e => e.kind === 'vehicle' && e.id === 'v1');
+    assert.ok(vMsg);
+    assert.strictEqual(vMsg.owner, 'p1');
+    const pUpdate = messages[2].entities.find(e => e.kind === 'player' && e.id === 'p1');
+    assert.ok(!pUpdate || !('vehicles' in pUpdate));
+
+    // Move vehicle -> only modified attribute sent
+    players.p1.vehicles[0].x = 10;
+    now = 4300;
+    gameLoop();
+    assert.strictEqual(messages.length, 4);
+    const move = messages[3].entities.find(e => e.kind === 'vehicle' && e.id === 'v1');
+    assert.deepStrictEqual(Object.keys(move).sort(), ['id', 'kind', 'owner', 'x']);
+    assert.strictEqual(move.x, 10);
   } finally {
     Date.now = realNow;
   }
