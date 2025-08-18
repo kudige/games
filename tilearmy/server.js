@@ -73,6 +73,7 @@ const players = Object.create(null); // { id: { bases, vehicles, color, ore, lum
 const resources = []; // [{id,type,x,y,amount}]
 const bases = []; // [{id,x,y,owner,hp,damage,rof,level,queue}]
 const connections = Object.create(null); // playerId -> ws
+const lastSeq = Object.create(null); // last processed input seq per player
 let seeded = false;
 
 function vehiclesForBaseLevel(level){
@@ -350,6 +351,7 @@ wss.on('connection', (ws, req) => {
   players[id].disconnectedAt = null;
   players[id].offline = false;
   connections[id] = ws;
+  ws.pid = id;
 
   ws.send(JSON.stringify({ type: 'init', id, state: snapshotState() }));
 
@@ -367,6 +369,7 @@ wss.on('connection', (ws, req) => {
         v.state = 'idle'; v.targetRes = null; // manual override
         v.tx = clamp(msg.x, 0, CFG.MAP_W);
         v.ty = clamp(msg.y, 0, CFG.MAP_H);
+        if (typeof msg.seq === 'number') lastSeq[id] = msg.seq;
       }
     }
     else if (msg.type === 'harvestResource') {
@@ -618,9 +621,10 @@ function gameLoop(){
   const state = snapshotState();
   const changed = diffState(lastSnapshot, state);
   if (changed.length && now - lastSnapshotTime >= 1000) {
-    const snap = JSON.stringify({ type: 'update', entities: changed });
     for (const client of wss.clients) {
-      if (client.readyState === WebSocket.OPEN) client.send(snap);
+      if (client.readyState !== WebSocket.OPEN) continue;
+      const ack = lastSeq[client.pid] || 0;
+      client.send(JSON.stringify({ type: 'update', ack, entities: changed }));
     }
     lastSnapshot = JSON.parse(JSON.stringify(state));
     lastSnapshotTime = now;

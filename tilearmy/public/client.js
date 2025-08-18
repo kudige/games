@@ -135,6 +135,8 @@
   let myId = null;
   let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:1000, VEHICLE_TYPES:{}, BASE_HP:200, NEUTRAL_BASE_HP:150, BASE_ATTACK_RANGE:150 } };
   let selected = null; // {type:'base'|'vehicle', id}
+  let inputSeq = 0;
+  const pendingMoves = [];
   const renderVehicles = {}; // smoothed positions and angles
   const bullets = [];
   const fireTimers = Object.create(null);
@@ -149,6 +151,20 @@
       if (vh) return { vehicle: vh, pid };
     }
     return null;
+  }
+
+  function applyLocalMove(vehicleId, x, y){
+    const me = state.players[myId];
+    if (!me) return;
+    const v = me.vehicles.find(v => v.id === vehicleId);
+    if (v){ v.tx = x; v.ty = y; }
+  }
+
+  function sendMove(vehicleId, x, y){
+    inputSeq++;
+    pendingMoves.push({ seq: inputSeq, vehicleId, x, y });
+    ws.send(JSON.stringify({ type: 'moveVehicle', vehicleId, x, y, seq: inputSeq }));
+    applyLocalMove(vehicleId, x, y);
   }
 
   // Camera
@@ -405,6 +421,10 @@
       updateSpawnControls();
     } else if (msg.type === 'update') {
       applyUpdates(msg.entities);
+      if (typeof msg.ack === 'number') {
+        while (pendingMoves.length && pendingMoves[0].seq <= msg.ack) pendingMoves.shift();
+      }
+      for (const m of pendingMoves) applyLocalMove(m.vehicleId, m.x, m.y);
       const p = state.players[myId] || {};
       const cur = (p.bases || []).join(',') + '|' +
         (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' +
@@ -413,6 +433,10 @@
       updateSpawnControls();
     } else if (msg.type === 'state') {
       state = msg.state || state;
+      if (typeof msg.ack === 'number') {
+        while (pendingMoves.length && pendingMoves[0].seq <= msg.ack) pendingMoves.shift();
+      }
+      for (const m of pendingMoves) applyLocalMove(m.vehicleId, m.x, m.y);
       const p = state.players[myId] || {};
       const cur = (p.bases || []).join(',') + '|' +
         (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' +
@@ -610,7 +634,7 @@
     if (res) {
       ws.send(JSON.stringify({ type: 'harvestResource', vehicleId: selected.id, resourceId: res.id }));
     } else {
-      ws.send(JSON.stringify({ type: 'moveVehicle', vehicleId: selected.id, x: w.x, y: w.y }));
+      sendMove(selected.id, w.x, w.y);
     }
     return false;
   }
@@ -775,6 +799,24 @@
       ctx.fill();
     }
     ctx.restore();
+  }
+
+  function predictMyVehicles(dt){
+    const me = state.players[myId];
+    if (!me) return;
+    for (const v of me.vehicles){
+      const tx = v.tx ?? v.x;
+      const ty = v.ty ?? v.y;
+      const dx = tx - v.x;
+      const dy = ty - v.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 0.5){
+        const step = (v.speed || 0) * dt;
+        const mv = Math.min(step, dist);
+        v.x += (dx / dist) * mv;
+        v.y += (dy / dist) * mv;
+      }
+    }
   }
 
   function smoothVehiclePositions(){
@@ -1002,6 +1044,7 @@
     lastFrame = now;
     ctx.clearRect(0,0,canvas.width,canvas.height);
     updateCamera(dt);
+    predictMyVehicles(dt);
     smoothVehiclePositions();
     handleCombat();
     updateBullets(dt);

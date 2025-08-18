@@ -22,7 +22,7 @@ test('state updates are throttled and only send changed entities', () => {
   wss.clients.clear();
 
   const messages = [];
-  const fake = { readyState: WebSocket.OPEN, send: m => messages.push(JSON.parse(m)) };
+  const fake = { readyState: WebSocket.OPEN, pid: 'p1', send: m => messages.push(JSON.parse(m)) };
   wss.clients.add(fake);
 
   try {
@@ -37,6 +37,7 @@ test('state updates are throttled and only send changed entities', () => {
     gameLoop();
     assert.strictEqual(messages.length, 1);
     assert.strictEqual(messages[0].type, 'update');
+    assert.strictEqual(messages[0].ack, 0);
     assert.ok(Array.isArray(messages[0].entities));
     const pMsg = messages[0].entities.find(e => e.kind === 'player' && e.id === 'p1');
     assert.ok(pMsg);
