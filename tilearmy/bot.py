@@ -65,7 +65,17 @@ async def bot_player(
                             for k in resources:
                                 resources[k] = ent.get(k, resources[k])
                 if verbose:
-                    print(f"[{name}] <- {data}")
+                    if data.get("type") == "update":
+                        print(f"[{name}] update:")
+                        for ent in data.get("entities", []):
+                            attrs = ", ".join(
+                                f"{k}={v}" for k, v in ent.items() if k not in ("kind", "id")
+                            )
+                            print(
+                                f"  - {ent.get('kind')} {ent.get('id')}: {attrs}"
+                            )
+                    else:
+                        print(f"[{name}] <- {data}")
 
         async def spawner():
             while True:

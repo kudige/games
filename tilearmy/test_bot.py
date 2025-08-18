@@ -41,7 +41,10 @@ class BotPlayerTests(unittest.TestCase):
                 )
             )
             for _ in range(2):
-                received.append(json.loads(await ws.recv()))
+                try:
+                    received.append(json.loads(await ws.recv()))
+                except websockets.ConnectionClosed:
+                    break
             await ws.wait_closed()
 
         async def run():
@@ -50,7 +53,7 @@ class BotPlayerTests(unittest.TestCase):
                 task = asyncio.create_task(
                     bot_player(f"ws://localhost:{port}/", "tester", interval=0.01)
                 )
-                await asyncio.sleep(0.03)
+                await asyncio.sleep(0.05)
                 task.cancel()
                 try:
                     await task
@@ -81,6 +84,23 @@ class BotPlayerTests(unittest.TestCase):
                 )
             )
             await ws.recv()
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "update",
+                        "entities": [
+                            {"kind": "player", "id": name, "ore": 12},
+                            {
+                                "kind": "vehicle",
+                                "id": 1,
+                                "owner": name,
+                                "x": 3,
+                            },
+                        ],
+                    }
+                )
+            )
+            await asyncio.sleep(0.01)
             await ws.wait_closed()
 
         async def run():
@@ -95,7 +115,7 @@ class BotPlayerTests(unittest.TestCase):
                             verbose=True,
                         )
                     )
-                    await asyncio.sleep(0.02)
+                    await asyncio.sleep(0.05)
                     task.cancel()
                     try:
                         await task
@@ -106,6 +126,9 @@ class BotPlayerTests(unittest.TestCase):
         logged = output.getvalue()
         self.assertIn("spawn scout", logged)
         self.assertIn("ore=10", logged)
+        self.assertIn("[tester] update:", logged)
+        self.assertIn("player tester: ore=12", logged)
+        self.assertIn("vehicle 1: owner=tester, x=3", logged)
 
 
 if __name__ == "__main__":
