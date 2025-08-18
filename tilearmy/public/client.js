@@ -136,6 +136,7 @@
   let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:1000, VEHICLE_TYPES:{}, BASE_HP:200, NEUTRAL_BASE_HP:150, BASE_ATTACK_RANGE:150 } };
   let selected = null; // {type:'base'|'vehicle', id}
   const renderVehicles = {}; // smoothed positions and angles
+  const vehicleUpdates = {}; // pending movement updates
   const bullets = [];
   const fireTimers = Object.create(null);
   const bookmarks = [];
@@ -149,6 +150,41 @@
       if (vh) return { vehicle: vh, pid };
     }
     return null;
+  }
+
+  function predictFromUpdate(upd, now){
+    const speed = Math.hypot(upd.vx, upd.vy);
+    const total = Math.hypot(upd.fx - upd.startX, upd.fy - upd.startY);
+    let t = (now - upd.startTime) / 1000;
+    if (speed > 0){
+      const maxT = total / speed;
+      if (t > maxT) t = maxT;
+    } else t = 0;
+    return { x: upd.startX + upd.vx * t, y: upd.startY + upd.vy * t };
+  }
+
+  function currentVehiclePos(id, now){
+    const q = vehicleUpdates[id];
+    if (q && q.length) return predictFromUpdate(q[0], now);
+    return null;
+  }
+
+  function resetVehicleQueues(){
+    const now = performance.now();
+    for (const pid in state.players){
+      const p = state.players[pid]; if (!p) continue;
+      for (const v of p.vehicles || []){
+        const fx = v.tx ?? v.x;
+        const fy = v.ty ?? v.y;
+        const dx = fx - v.x;
+        const dy = fy - v.y;
+        const dist = Math.hypot(dx, dy);
+        const spd = v.speed || 0;
+        const vx = dist ? (dx / dist) * spd : 0;
+        const vy = dist ? (dy / dist) * spd : 0;
+        vehicleUpdates[v.id] = [{ startX: v.x, startY: v.y, vx, vy, fx, fy, startTime: now }];
+      }
+    }
   }
 
   // Camera
@@ -372,15 +408,28 @@
           }
         }
       } else if (ent.kind === 'vehicle'){
-        const { id, owner, removed, kind, ...rest } = ent;
+        const { id, owner, removed, kind, fx, fy, vx, vy, ...rest } = ent;
         const p = state.players[owner] = state.players[owner] || {};
         p.vehicles = p.vehicles || [];
         const idx = p.vehicles.findIndex(v=>v.id===id);
         if (removed){
           if (idx!==-1) p.vehicles.splice(idx,1);
+          delete vehicleUpdates[id];
         } else {
           const obj = { ...(idx!==-1 ? p.vehicles[idx] : {}), id, ...rest };
+          if (fx !== undefined) obj.tx = fx;
+          if (fy !== undefined) obj.ty = fy;
           if (idx!==-1) p.vehicles[idx]=obj; else p.vehicles.push(obj);
+          const now = performance.now();
+          let startX = obj.x;
+          let startY = obj.y;
+          const prev = currentVehiclePos(id, now);
+          if (prev && rest.x !== undefined && rest.y !== undefined){
+            const diff = Math.hypot(prev.x - rest.x, prev.y - rest.y);
+            if (diff <= 1){ startX = prev.x; startY = prev.y; }
+          }
+          vehicleUpdates[id] = [{ startX, startY, vx: vx||0, vy: vy||0, fx: fx!==undefined?fx:startX, fy: fy!==undefined?fy:startY, startTime: now }];
+          obj.x = startX; obj.y = startY;
         }
       }
     }
@@ -399,6 +448,7 @@
         camera.x = Math.max(0, Math.min(camera.x, state.cfg.MAP_W - canvas.width / camera.scale));
         camera.y = Math.max(0, Math.min(camera.y, state.cfg.MAP_H - canvas.height / camera.scale));
       }
+      resetVehicleQueues();
       refreshVehicleTypes();
       rebuildDashboard();
       updateCursorInfo();
@@ -413,6 +463,7 @@
       updateSpawnControls();
     } else if (msg.type === 'state') {
       state = msg.state || state;
+      resetVehicleQueues();
       const p = state.players[myId] || {};
       const cur = (p.bases || []).join(',') + '|' +
         (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' +
@@ -777,6 +828,40 @@
     ctx.restore();
   }
 
+  function extrapolateVehiclePositions(){
+    const now = performance.now();
+    for (const pid in state.players){
+      const p = state.players[pid]; if (!p) continue;
+      for (const v of p.vehicles){
+        const q = vehicleUpdates[v.id];
+        if (!q || !q.length) continue;
+        const upd = q[0];
+        const speed = Math.hypot(upd.vx, upd.vy);
+        const total = Math.hypot(upd.fx - upd.startX, upd.fy - upd.startY);
+        let t = (now - upd.startTime)/1000;
+        let nx = upd.startX;
+        let ny = upd.startY;
+        if (speed > 0){
+          const maxT = total / speed;
+          if (t > maxT) t = maxT;
+          nx += upd.vx * t;
+          ny += upd.vy * t;
+        }
+        v.x = nx;
+        v.y = ny;
+        const traveled = Math.hypot(nx - upd.startX, ny - upd.startY);
+        if (traveled >= total || speed === 0){
+          q.shift();
+          if (q.length){
+            q[0].startX = nx;
+            q[0].startY = ny;
+            q[0].startTime = now;
+          }
+        }
+      }
+    }
+  }
+
   function smoothVehiclePositions(){
     const seen = new Set();
     const smooth = 0.25;
@@ -1002,6 +1087,7 @@
     lastFrame = now;
     ctx.clearRect(0,0,canvas.width,canvas.height);
     updateCamera(dt);
+    extrapolateVehiclePositions();
     smoothVehiclePositions();
     handleCombat();
     updateBullets(dt);

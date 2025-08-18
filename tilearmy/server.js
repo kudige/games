@@ -260,9 +260,20 @@ function diffState(prev, curr) {
     for (const vid in currVeh) {
       const cv = currVeh[vid];
       const pv = prevVeh[vid];
-      const vDiff = diffObj(pv, cv);
-      delete vDiff.id;
-      if (Object.keys(vDiff).length) changed.push({ kind: 'vehicle', owner: id, id: vid, ...vDiff });
+      const baseDiff = diffObj(pv, cv);
+      delete baseDiff.id;
+      const fx = cv.tx ?? cv.x;
+      const fy = cv.ty ?? cv.y;
+      const dx = fx - cv.x;
+      const dy = fy - cv.y;
+      const dist = Math.hypot(dx, dy);
+      const speed = cv.speed || 0;
+      const vx = dist ? (dx / dist) * speed : 0;
+      const vy = dist ? (dy / dist) * speed : 0;
+      const payload = { ...baseDiff, vx, vy, fx, fy };
+      if (Object.keys(baseDiff).length || vx || vy) {
+        changed.push({ kind: 'vehicle', owner: id, id: vid, ...payload });
+      }
       delete prevVeh[vid];
     }
     for (const vid in prevVeh) changed.push({ kind: 'vehicle', owner: id, id: vid, removed: true });
