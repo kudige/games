@@ -181,7 +181,53 @@ function snapshotState(){
   };
 }
 
-let lastSnapshot = JSON.stringify(snapshotState());
+function diffState(prev, curr) {
+  const changed = [];
+
+  const prevRes = Object.create(null);
+  for (const r of prev.resources || []) prevRes[r.id] = r;
+  const currRes = Object.create(null);
+  for (const r of curr.resources || []) currRes[r.id] = r;
+  for (const id in currRes) {
+    const r = currRes[id];
+    const pr = prevRes[id];
+    if (!pr || JSON.stringify(r) !== JSON.stringify(pr)) {
+      changed.push({ kind: 'resource', ...r });
+    }
+    delete prevRes[id];
+  }
+  for (const id in prevRes) changed.push({ kind: 'resource', id, removed: true });
+
+  const prevBases = Object.create(null);
+  for (const b of prev.bases || []) prevBases[b.id] = b;
+  const currBases = Object.create(null);
+  for (const b of curr.bases || []) currBases[b.id] = b;
+  for (const id in currBases) {
+    const b = currBases[id];
+    const pb = prevBases[id];
+    if (!pb || JSON.stringify(b) !== JSON.stringify(pb)) {
+      changed.push({ kind: 'base', ...b });
+    }
+    delete prevBases[id];
+  }
+  for (const id in prevBases) changed.push({ kind: 'base', id, removed: true });
+
+  const prevPlayers = { ...(prev.players || {}) };
+  const currPlayers = curr.players || {};
+  for (const id in currPlayers) {
+    const p = currPlayers[id];
+    const pp = prevPlayers[id];
+    if (!pp || JSON.stringify(p) !== JSON.stringify(pp)) {
+      changed.push({ kind: 'player', id, ...p });
+    }
+    delete prevPlayers[id];
+  }
+  for (const id in prevPlayers) changed.push({ kind: 'player', id, removed: true });
+
+  return changed;
+}
+
+let lastSnapshot = JSON.parse(JSON.stringify(snapshotState()));
 let lastSnapshotTime = Date.now();
 
 function nearestBase(pl, x, y){
@@ -512,15 +558,15 @@ function gameLoop(){
   // Capture bases
   resolveCaptures();
 
-  // Broadcast snapshot at most once per second and only on change
+  // Broadcast only changed entities at most once per second
   const state = snapshotState();
-  const stateStr = JSON.stringify(state);
-  if (stateStr !== lastSnapshot && now - lastSnapshotTime >= 1000) {
-    const snap = JSON.stringify({ type: 'state', state });
-    for (const client of wss.clients){
+  const changed = diffState(lastSnapshot, state);
+  if (changed.length && now - lastSnapshotTime >= 1000) {
+    const snap = JSON.stringify({ type: 'update', entities: changed });
+    for (const client of wss.clients) {
       if (client.readyState === WebSocket.OPEN) client.send(snap);
     }
-    lastSnapshot = stateStr;
+    lastSnapshot = JSON.parse(JSON.stringify(state));
     lastSnapshotTime = now;
   }
 }
