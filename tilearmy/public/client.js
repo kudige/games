@@ -208,7 +208,7 @@
       basesDiv.appendChild(btn);
     });
 
-    me.vehicles.forEach(v => {
+    (me.vehicles || []).forEach(v => {
       const btn = document.createElement('button');
       const moving = Math.hypot((v.tx ?? v.x) - v.x, (v.ty ?? v.y) - v.y) > 1;
       btn.textContent = v.id + ' ' + (v.type||'') + (moving?' →':'') + (v.state==='returning'?' ↩':'') + (v.state==='harvesting'?' ⛏':'');
@@ -332,23 +332,55 @@
     for (const ent of entities || []){
       if (ent.kind === 'player'){
         const { id, removed, kind, ...rest } = ent;
-        if (removed) delete state.players[id];
-        else state.players[id] = rest;
+        if (removed) {
+          delete state.players[id];
+        } else {
+          const existing = state.players[id] || {};
+          state.players[id] = { ...existing, ...rest };
+          if (!state.players[id].vehicles) state.players[id].vehicles = existing.vehicles || [];
+        }
       } else if (ent.kind === 'base'){
         const { id, removed, kind, ...rest } = ent;
         const idx = state.bases.findIndex(b=>b.id===id);
-        if (removed){ if (idx!==-1) state.bases.splice(idx,1); }
-        else {
-          const obj = { id, ...rest };
+        if (removed){
+          if (idx!==-1) state.bases.splice(idx,1);
+        } else {
+          const obj = { ...(idx!==-1 ? state.bases[idx] : {}), id, ...rest };
           if (idx!==-1) state.bases[idx]=obj; else state.bases.push(obj);
         }
       } else if (ent.kind === 'resource'){
         const { id, removed, kind, ...rest } = ent;
         const idx = state.resources.findIndex(r=>r.id===id);
-        if (removed){ if (idx!==-1) state.resources.splice(idx,1); }
-        else {
-          const obj = { id, ...rest };
-          if (idx!==-1) state.resources[idx]=obj; else state.resources.push(obj);
+        if (idx !== -1 || 'type' in rest || 'x' in rest || 'y' in rest || 'amount' in rest){
+          if (removed){
+            if (idx!==-1) state.resources.splice(idx,1);
+          } else {
+            const obj = { ...(idx!==-1 ? state.resources[idx] : {}), id, ...rest };
+            if (idx!==-1) state.resources[idx]=obj; else state.resources.push(obj);
+          }
+        } else {
+          if (removed){
+            if (state.players[id]) {
+              delete state.players[id].ore;
+              delete state.players[id].lumber;
+              delete state.players[id].stone;
+              delete state.players[id].energy;
+            }
+          } else {
+            const p = state.players[id] = state.players[id] || {};
+            Object.assign(p, rest);
+          }
+        }
+      } else if (ent.kind === 'vehicle'){
+        const { id, owner, removed, kind, ...rest } = ent;
+        const p = state.players[owner] = state.players[owner] || {};
+        p.vehicles = p.vehicles || [];
+        const idx = p.vehicles.findIndex(v=>v.id===id);
+        if (removed){
+          if (idx!==-1) p.vehicles.splice(idx,1);
+        } else {
+          const obj = { ...(idx!==-1 ? p.vehicles[idx] : {}), id, ...rest };
+          if (idx!==-1) p.vehicles[idx]=obj; else p.vehicles.push(obj);
         }
       }
     }
