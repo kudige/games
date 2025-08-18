@@ -184,6 +184,17 @@ function snapshotState(){
 function diffState(prev, curr) {
   const changed = [];
 
+  const diffObj = (prevObj, currObj) => {
+    const diff = {};
+    if (!currObj) return diff;
+    for (const k in currObj) {
+      if (!prevObj || JSON.stringify(currObj[k]) !== JSON.stringify(prevObj[k])) {
+        diff[k] = currObj[k];
+      }
+    }
+    return diff;
+  };
+
   const prevRes = Object.create(null);
   for (const r of prev.resources || []) prevRes[r.id] = r;
   const currRes = Object.create(null);
@@ -191,9 +202,9 @@ function diffState(prev, curr) {
   for (const id in currRes) {
     const r = currRes[id];
     const pr = prevRes[id];
-    if (!pr || JSON.stringify(r) !== JSON.stringify(pr)) {
-      changed.push({ kind: 'resource', ...r });
-    }
+    const diff = diffObj(pr, r);
+    diff.id = r.id;
+    if (Object.keys(diff).length > 1) changed.push({ kind: 'resource', ...diff });
     delete prevRes[id];
   }
   for (const id in prevRes) changed.push({ kind: 'resource', id, removed: true });
@@ -205,9 +216,9 @@ function diffState(prev, curr) {
   for (const id in currBases) {
     const b = currBases[id];
     const pb = prevBases[id];
-    if (!pb || JSON.stringify(b) !== JSON.stringify(pb)) {
-      changed.push({ kind: 'base', ...b });
-    }
+    const diff = diffObj(pb, b);
+    diff.id = b.id;
+    if (Object.keys(diff).length > 1) changed.push({ kind: 'base', ...diff });
     delete prevBases[id];
   }
   for (const id in prevBases) changed.push({ kind: 'base', id, removed: true });
@@ -217,9 +228,9 @@ function diffState(prev, curr) {
   for (const id in currPlayers) {
     const p = currPlayers[id];
     const pp = prevPlayers[id];
-    if (!pp || JSON.stringify(p) !== JSON.stringify(pp)) {
-      changed.push({ kind: 'player', id, ...p });
-    }
+    const diff = diffObj(pp, p);
+    diff.id = id;
+    if (Object.keys(diff).length > 1) changed.push({ kind: 'player', ...diff });
     delete prevPlayers[id];
   }
   for (const id in prevPlayers) changed.push({ kind: 'player', id, removed: true });

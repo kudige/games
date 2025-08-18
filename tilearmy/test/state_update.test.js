@@ -10,7 +10,10 @@ test('state updates are throttled and only send changed entities', () => {
 
   // Load fresh server state with stubbed time
   delete require.cache[require.resolve('../server')];
-  const { players, bases, resources, gameLoop, wss } = require('../server');
+  const { players, bases, resources, gameLoop, wss, CFG } = require('../server');
+
+  // Prevent passive energy changes interfering with diff tests
+  CFG.ENERGY_RECHARGE = 0;
 
   // Ensure clean state
   bases.length = 0;
@@ -44,10 +47,16 @@ test('state updates are throttled and only send changed entities', () => {
     gameLoop();
     assert.strictEqual(messages.length, 1);
 
+    // Modify a single attribute
+    players.p1.ore = 5;
+
     // After a second passes and state changed -> second broadcast
     now = 2200;
     gameLoop();
     assert.strictEqual(messages.length, 2);
+    const update = messages[1].entities.find(e => e.kind === 'player' && e.id === 'p1');
+    assert.deepStrictEqual(Object.keys(update).sort(), ['id', 'kind', 'ore']);
+    assert.strictEqual(update.ore, 5);
   } finally {
     Date.now = realNow;
   }
