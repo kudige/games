@@ -136,7 +136,7 @@
   let state = { players:{}, resources:[], bases:[], cfg:{ MAP_W:2000, MAP_H:2000, TILE_SIZE:32, RESOURCE_AMOUNT:1000, ENERGY_MAX:100, UNLOAD_TIME:1000, VEHICLE_TYPES:{}, BASE_HP:200, NEUTRAL_BASE_HP:150, BASE_ATTACK_RANGE:150 } };
   let selected = null; // {type:'base'|'vehicle', id}
   let inputSeq = 0;
-  const pendingMoves = [];
+  const pendingInputs = [];
   const renderVehicles = {}; // smoothed positions and angles
   const bullets = [];
   const fireTimers = Object.create(null);
@@ -153,6 +153,19 @@
     return null;
   }
 
+  function nearestMyBase(x, y){
+    const me = state.players[myId];
+    if (!me) return null;
+    let best=null, bd=Infinity;
+    for (const id of me.bases || []){
+      const b = getBase(id);
+      if (!b) continue;
+      const d = Math.hypot(b.x - x, b.y - y);
+      if (d < bd){ bd=d; best=b; }
+    }
+    return best;
+  }
+
   function applyLocalMove(vehicleId, x, y){
     const me = state.players[myId];
     if (!me) return;
@@ -160,11 +173,34 @@
     if (v){ v.tx = x; v.ty = y; }
   }
 
+  function applyLocalHarvest(vehicleId, resourceId){
+    const me = state.players[myId];
+    if (!me) return;
+    const v = me.vehicles.find(v => v.id === vehicleId);
+    const r = state.resources.find(r => r.id === resourceId);
+    if (v && r){
+      v.preferType = r.type;
+      v.carrying = 0;
+      v.carryType = null;
+      v.targetRes = r.id;
+      v.tx = r.x;
+      v.ty = r.y;
+      v.state = 'idle';
+    }
+  }
+
   function sendMove(vehicleId, x, y){
     inputSeq++;
-    pendingMoves.push({ seq: inputSeq, vehicleId, x, y });
+    pendingInputs.push({ seq: inputSeq, type: 'move', vehicleId, x, y });
     ws.send(JSON.stringify({ type: 'moveVehicle', vehicleId, x, y, seq: inputSeq }));
     applyLocalMove(vehicleId, x, y);
+  }
+
+  function sendHarvest(vehicleId, resourceId){
+    inputSeq++;
+    pendingInputs.push({ seq: inputSeq, type: 'harvest', vehicleId, resourceId });
+    ws.send(JSON.stringify({ type: 'harvestResource', vehicleId, resourceId, seq: inputSeq }));
+    applyLocalHarvest(vehicleId, resourceId);
   }
 
   // Camera
@@ -421,10 +457,13 @@
       updateSpawnControls();
     } else if (msg.type === 'update') {
       applyUpdates(msg.entities);
-      if (typeof msg.ack === 'number') {
-        while (pendingMoves.length && pendingMoves[0].seq <= msg.ack) pendingMoves.shift();
-      }
-      for (const m of pendingMoves) applyLocalMove(m.vehicleId, m.x, m.y);
+        if (typeof msg.ack === 'number') {
+          while (pendingInputs.length && pendingInputs[0].seq <= msg.ack) pendingInputs.shift();
+        }
+        for (const p of pendingInputs) {
+          if (p.type === 'move') applyLocalMove(p.vehicleId, p.x, p.y);
+          else if (p.type === 'harvest') applyLocalHarvest(p.vehicleId, p.resourceId);
+        }
       const p = state.players[myId] || {};
       const cur = (p.bases || []).join(',') + '|' +
         (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' +
@@ -433,10 +472,13 @@
       updateSpawnControls();
     } else if (msg.type === 'state') {
       state = msg.state || state;
-      if (typeof msg.ack === 'number') {
-        while (pendingMoves.length && pendingMoves[0].seq <= msg.ack) pendingMoves.shift();
-      }
-      for (const m of pendingMoves) applyLocalMove(m.vehicleId, m.x, m.y);
+        if (typeof msg.ack === 'number') {
+          while (pendingInputs.length && pendingInputs[0].seq <= msg.ack) pendingInputs.shift();
+        }
+        for (const p of pendingInputs) {
+          if (p.type === 'move') applyLocalMove(p.vehicleId, p.x, p.y);
+          else if (p.type === 'harvest') applyLocalHarvest(p.vehicleId, p.resourceId);
+        }
       const p = state.players[myId] || {};
       const cur = (p.bases || []).join(',') + '|' +
         (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' +
@@ -631,11 +673,11 @@
     if (!selected || selected.type !== 'vehicle') return false;
     const rr = state.cfg.RESOURCE_RADIUS || 22;
     const res = state.resources.find(res => Math.hypot(res.x - w.x, res.y - w.y) <= rr);
-    if (res) {
-      ws.send(JSON.stringify({ type: 'harvestResource', vehicleId: selected.id, resourceId: res.id }));
-    } else {
-      sendMove(selected.id, w.x, w.y);
-    }
+      if (res) {
+        sendHarvest(selected.id, res.id);
+      } else {
+        sendMove(selected.id, w.x, w.y);
+      }
     return false;
   }
 
@@ -815,6 +857,52 @@
         const mv = Math.min(step, dist);
         v.x += (dx / dist) * mv;
         v.y += (dy / dist) * mv;
+      }
+
+      if (v.capacity > 0){
+        // Unloading at base
+        if (v.state === 'returning' || v.state === 'unloading'){
+          const base = getBase(v.targetBase);
+          if (base && Math.hypot(v.x - base.x, v.y - base.y) < 30){
+            if (v.state !== 'unloading'){
+              v.state = 'unloading';
+              v.unloadTimer = v.unloadTimer ?? (v.unloadTime ?? state.cfg.UNLOAD_TIME);
+            } else {
+              v.unloadTimer -= dt*1000;
+              if (v.unloadTimer <= 0){
+                if (v.carryType){ me[v.carryType] = (me[v.carryType]||0) + v.carrying; }
+                v.carrying = 0; v.carryType=null; v.state='idle'; v.targetRes=null; v.targetBase=null; v.unloadTimer=0;
+                rebuildDashboard();
+              }
+            }
+          }
+        }
+
+        // Harvesting resources
+        const harvestRate = v.harvestRate || state.cfg.HARVEST_RATE || 0;
+        if (v.carrying >= v.capacity){
+          if (v.state !== 'returning' && v.state !== 'unloading'){
+            const b = nearestMyBase(v.x, v.y);
+            if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
+          }
+        } else if (v.targetRes){
+          const r = state.resources.find(r => r.id === v.targetRes);
+          if (r && r.amount > 0){
+            const d = Math.hypot(r.x - v.x, r.y - v.y);
+            if (d <= (state.cfg.RESOURCE_RADIUS || 22)){
+              v.state = 'harvesting';
+              const take = Math.min(harvestRate * dt, v.capacity - v.carrying, r.amount);
+              if (take > 0){ v.carryType = v.carryType || r.type; v.carrying += take; r.amount -= take; }
+              if (v.carrying >= v.capacity || r.amount <= 0){
+                const b = nearestMyBase(v.x, v.y);
+                if (b){ v.state='returning'; v.tx=b.x; v.ty=b.y; v.targetRes=null; v.targetBase=b.id; }
+              }
+            }
+          } else {
+            v.state='idle';
+            v.targetRes=null;
+          }
+        }
       }
     }
   }
