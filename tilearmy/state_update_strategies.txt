@@ -1,0 +1,5 @@
+1. **Delta-based updates**: Send only changes since the last state rather than the full world state. Clients apply patches to their local state, reducing bandwidth and serialization overhead.
+2. **Spatial partitioning**: Divide the world into regions or chunks and only broadcast updates for tiles and entities within a client's view or interest radius.
+3. **Compression and batching**: Aggregate multiple small updates into a single packet and use lightweight compression to minimize payload size before sending over the network.
+4. **Priority queues**: Prioritize essential events (combat, resource depletion, player commands) and defer or rate-limit less critical updates to smooth out bursts in traffic.
+5. **Client-side prediction with reconciliation**: Let clients predict short-term state (movement, resource gathering) and reconcile periodically with server snapshots, avoiding the need for constant precise updates.
