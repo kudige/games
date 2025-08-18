@@ -328,6 +328,32 @@
     return allowed;
   }
 
+  function applyUpdates(entities){
+    for (const ent of entities || []){
+      if (ent.kind === 'player'){
+        const { id, removed, kind, ...rest } = ent;
+        if (removed) delete state.players[id];
+        else state.players[id] = rest;
+      } else if (ent.kind === 'base'){
+        const { id, removed, kind, ...rest } = ent;
+        const idx = state.bases.findIndex(b=>b.id===id);
+        if (removed){ if (idx!==-1) state.bases.splice(idx,1); }
+        else {
+          const obj = { id, ...rest };
+          if (idx!==-1) state.bases[idx]=obj; else state.bases.push(obj);
+        }
+      } else if (ent.kind === 'resource'){
+        const { id, removed, kind, ...rest } = ent;
+        const idx = state.resources.findIndex(r=>r.id===id);
+        if (removed){ if (idx!==-1) state.resources.splice(idx,1); }
+        else {
+          const obj = { id, ...rest };
+          if (idx!==-1) state.resources[idx]=obj; else state.resources.push(obj);
+        }
+      }
+    }
+  }
+
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'init') {
@@ -344,6 +370,14 @@
       refreshVehicleTypes();
       rebuildDashboard();
       updateCursorInfo();
+      updateSpawnControls();
+    } else if (msg.type === 'update') {
+      applyUpdates(msg.entities);
+      const p = state.players[myId] || {};
+      const cur = (p.bases || []).join(',') + '|' +
+        (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' +
+        Math.floor(p.ore||0) + '|' + Math.floor(p.lumber||0) + '|' + Math.floor(p.stone||0) + '|' + Math.floor(p.energy||0);
+      if (rebuildDashboard._last !== cur) { rebuildDashboard._last = cur; rebuildDashboard(); }
       updateSpawnControls();
     } else if (msg.type === 'state') {
       state = msg.state || state;

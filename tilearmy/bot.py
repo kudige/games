@@ -59,6 +59,11 @@ async def bot_player(
                     if me:
                         for k in resources:
                             resources[k] = me.get(k, resources[k])
+                elif data.get("type") == "update":
+                    for ent in data.get("entities", []):
+                        if ent.get("kind") == "player" and ent.get("id") == name:
+                            for k in resources:
+                                resources[k] = ent.get(k, resources[k])
                 if verbose:
                     print(f"[{name}] <- {data}")
 
