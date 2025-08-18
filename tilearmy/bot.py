@@ -21,7 +21,21 @@ def build_ws_url(base_url: str, name: str) -> str:
     return f"{base}{sep}name={name}"
 
 
-async def bot_player(base_url: str, name: str):
+async def bot_player(base_url: str, name: str, interval: float = 5) -> None:
+    """Join the game server and periodically spawn scout vehicles.
+
+    Parameters
+    ----------
+    base_url: str
+        Base websocket or http URL for the game server.
+    name: str
+        Player name for this bot.
+    interval: float, optional
+        Delay between spawn commands in seconds. Defaults to 5 seconds.
+        This is primarily exposed for testing so the interval can be
+        shortened without affecting normal behaviour.
+    """
+
     ws_url = build_ws_url(base_url, name)
     async with websockets.connect(ws_url) as ws:
         init = json.loads(await ws.recv())
@@ -41,7 +55,7 @@ async def bot_player(base_url: str, name: str):
                         {"type": "spawnVehicle", "baseId": base_id, "vType": "scout"}
                     )
                 )
-                await asyncio.sleep(5)
+                await asyncio.sleep(interval)
 
         await asyncio.gather(receiver(), spawner())
 
