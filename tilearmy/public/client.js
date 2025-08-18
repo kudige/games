@@ -137,6 +137,7 @@
   let selected = null; // {type:'base'|'vehicle', id}
   const renderVehicles = {}; // smoothed positions and angles
   const vehicleUpdates = {}; // pending movement updates
+  const cargoUpdates = {}; // pending cargo load/unload updates
   const bullets = [];
   const fireTimers = Object.create(null);
   const bookmarks = [];
@@ -169,6 +170,23 @@
     return null;
   }
 
+  function predictCargo(upd, now){
+    let t = (now - upd.startTime) / 1000;
+    let val = upd.start + upd.rate * t;
+    if (upd.rate >= 0) {
+      if (val > upd.final) val = upd.final;
+    } else {
+      if (val < upd.final) val = upd.final;
+    }
+    return val;
+  }
+
+  function currentCargo(id, now){
+    const q = cargoUpdates[id];
+    if (q && q.length) return predictCargo(q[0], now);
+    return null;
+  }
+
   function resetVehicleQueues(){
     const now = performance.now();
     for (const pid in state.players){
@@ -183,6 +201,7 @@
         const vx = dist ? (dx / dist) * spd : 0;
         const vy = dist ? (dy / dist) * spd : 0;
         vehicleUpdates[v.id] = [{ startX: v.x, startY: v.y, vx, vy, fx, fy, startTime: now }];
+        cargoUpdates[v.id] = [{ start: v.carrying || 0, rate: 0, final: v.carrying || 0, startTime: now }];
       }
     }
   }
@@ -408,13 +427,14 @@
           }
         }
       } else if (ent.kind === 'vehicle'){
-        const { id, owner, removed, kind, fx, fy, vx, vy, ...rest } = ent;
+        const { id, owner, removed, kind, fx, fy, vx, vy, cr, fc, ...rest } = ent;
         const p = state.players[owner] = state.players[owner] || {};
         p.vehicles = p.vehicles || [];
         const idx = p.vehicles.findIndex(v=>v.id===id);
         if (removed){
           if (idx!==-1) p.vehicles.splice(idx,1);
           delete vehicleUpdates[id];
+          delete cargoUpdates[id];
         } else {
           const obj = { ...(idx!==-1 ? p.vehicles[idx] : {}), id, ...rest };
           if (fx !== undefined) obj.tx = fx;
@@ -430,6 +450,19 @@
           }
           vehicleUpdates[id] = [{ startX, startY, vx: vx||0, vy: vy||0, fx: fx!==undefined?fx:startX, fy: fy!==undefined?fy:startY, startTime: now }];
           obj.x = startX; obj.y = startY;
+          if (cr !== undefined){
+            let startC = obj.carrying || 0;
+            if (rest.carrying !== undefined) startC = rest.carrying;
+            const prevC = currentCargo(id, now);
+            if (prevC !== null && rest.carrying !== undefined){
+              if (Math.abs(prevC - rest.carrying) <= 1) startC = prevC;
+            }
+            cargoUpdates[id] = [{ start: startC, rate: cr || 0, final: fc !== undefined ? fc : startC, startTime: now }];
+            obj.carrying = startC;
+          } else if (rest.carrying !== undefined || rest.state !== undefined){
+            const val = rest.carrying !== undefined ? rest.carrying : (obj.carrying || 0);
+            cargoUpdates[id] = [{ start: val, rate: 0, final: val, startTime: now }];
+          }
         }
       }
     }
@@ -862,6 +895,27 @@
     }
   }
 
+  function extrapolateCargoLoads(){
+    const now = performance.now();
+    for (const pid in state.players){
+      const p = state.players[pid]; if (!p) continue;
+      for (const v of p.vehicles){
+        const q = cargoUpdates[v.id];
+        if (!q || !q.length) continue;
+        const upd = q[0];
+        let val = predictCargo(upd, now);
+        v.carrying = val;
+        if ((upd.rate >= 0 && val >= upd.final) || (upd.rate < 0 && val <= upd.final)){
+          q.shift();
+          if (q.length){
+            q[0].start = val;
+            q[0].startTime = now;
+          }
+        }
+      }
+    }
+  }
+
   function smoothVehiclePositions(){
     const seen = new Set();
     const smooth = 0.25;
@@ -1022,11 +1076,10 @@
           ctx.fillStyle = '#111'; ctx.fillRect(vx - W/2, vy - 24, W, H);
           ctx.fillStyle = '#ef4444'; ctx.fillRect(vx - W/2, vy - 24, W*hpFrac, H);
         }
-        let frac = (v.carrying || 0) / (v.capacity || 200);
-        if (v.state === 'unloading'){
-          const total = state.cfg.UNLOAD_TIME || 1000;
-          frac *= (v.unloadTimer || 0) / total;
-        }
+        let carry = v.carrying || 0;
+        const pc = currentCargo(v.id, performance.now());
+        if (pc !== null) carry = pc;
+        let frac = carry / (v.capacity || 200);
         if (frac > 0){
           const W = 26, H = 5;
           ctx.fillStyle = '#111'; ctx.fillRect(vx - W/2, vy - 18, W, H);
@@ -1088,6 +1141,7 @@
     ctx.clearRect(0,0,canvas.width,canvas.height);
     updateCamera(dt);
     extrapolateVehiclePositions();
+    extrapolateCargoLoads();
     smoothVehiclePositions();
     handleCombat();
     updateBullets(dt);

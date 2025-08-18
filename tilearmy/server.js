@@ -270,8 +270,20 @@ function diffState(prev, curr) {
       const speed = cv.speed || 0;
       const vx = dist ? (dx / dist) * speed : 0;
       const vy = dist ? (dy / dist) * speed : 0;
+      let cr = 0, fc;
+      if (cv.state === 'harvesting') {
+        cr = cv.harvestRate || CFG.HARVEST_RATE;
+        fc = cv.capacity;
+      } else if (cv.state === 'unloading') {
+        const total = cv.unloadTime ?? CFG.UNLOAD_TIME;
+        if (total > 0) {
+          cr = -((cv.carrying || 0) / (total / 1000));
+          fc = 0;
+        }
+      }
       const payload = { ...baseDiff, vx, vy, fx, fy };
-      if (Object.keys(baseDiff).length || vx || vy) {
+      if (cr) { payload.cr = cr; payload.fc = fc; }
+      if (Object.keys(baseDiff).length || vx || vy || cr) {
         changed.push({ kind: 'vehicle', owner: id, id: vid, ...payload });
       }
       delete prevVeh[vid];
