@@ -41,7 +41,9 @@ async def bot_player(
     """
 
     ws_url = build_ws_url(base_url, name)
-    async with websockets.connect(ws_url) as ws:
+    # Disable the default 1MB message size limit so the bot can handle
+    # large state updates from the server without disconnecting.
+    async with websockets.connect(ws_url, max_size=None) as ws:
         if verbose:
             print(f"[{name}] connected to {ws_url}")
         init = json.loads(await ws.recv())

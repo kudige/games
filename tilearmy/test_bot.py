@@ -130,6 +130,40 @@ class BotPlayerTests(unittest.TestCase):
         self.assertIn("player tester: ore=12", logged)
         self.assertIn("vehicle 1: owner=tester, x=3", logged)
 
+    def test_bot_player_handles_large_messages(self):
+        async def handler(ws):
+            query = parse_qs(urlparse(ws.request.path).query)
+            name = query["name"][0]
+            await ws.send(
+                json.dumps(
+                    {"type": "init", "state": {"players": {name: {"bases": [1]}}}}
+                )
+            )
+            await ws.recv()
+            big_payload = {
+                "type": "state",
+                "players": {},
+                "pad": "x" * (1024 * 1024 + 10),
+            }
+            await ws.send(json.dumps(big_payload))
+            await asyncio.sleep(0.01)
+            await ws.wait_closed()
+
+        async def run():
+            async with websockets.serve(handler, "localhost", 0) as server:
+                port = server.sockets[0].getsockname()[1]
+                task = asyncio.create_task(
+                    bot_player(f"ws://localhost:{port}/", "tester", interval=0.01)
+                )
+                await asyncio.sleep(0.05)
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()
