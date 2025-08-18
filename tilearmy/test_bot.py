@@ -1,6 +1,8 @@
 import asyncio
 import json
 import unittest
+from io import StringIO
+from contextlib import redirect_stdout
 from urllib.parse import parse_qs, urlparse
 
 import websockets
@@ -61,6 +63,49 @@ class BotPlayerTests(unittest.TestCase):
             received[0],
             {"type": "spawnVehicle", "baseId": 1, "vType": "scout"},
         )
+
+    def test_bot_player_verbose_logs(self):
+        output = StringIO()
+
+        async def handler(ws):
+            query = parse_qs(urlparse(ws.request.path).query)
+            name = query["name"][0]
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "init",
+                        "state": {
+                            "players": {name: {"bases": [1], "ore": 10, "lumber": 5, "stone": 2}}
+                        },
+                    }
+                )
+            )
+            await ws.recv()
+            await ws.wait_closed()
+
+        async def run():
+            async with websockets.serve(handler, "localhost", 0) as server:
+                port = server.sockets[0].getsockname()[1]
+                with redirect_stdout(output):
+                    task = asyncio.create_task(
+                        bot_player(
+                            f"ws://localhost:{port}/",
+                            "tester",
+                            interval=0.01,
+                            verbose=True,
+                        )
+                    )
+                    await asyncio.sleep(0.02)
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+
+        asyncio.run(run())
+        logged = output.getvalue()
+        self.assertIn("spawn scout", logged)
+        self.assertIn("ore=10", logged)
 
 
 if __name__ == "__main__":

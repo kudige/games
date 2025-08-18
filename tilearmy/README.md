@@ -57,4 +57,10 @@ pip install websockets
 python bot.py ws://localhost:3000/ 3
 ```
 
+Add `-v` to see each action along with the bot's resource counts:
+
+```bash
+python bot.py ws://localhost:3000/ 3 -v
+```
+
 The example above connects to a local server and starts three bot players.
