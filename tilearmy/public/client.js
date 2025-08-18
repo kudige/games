@@ -34,7 +34,10 @@
   }
 
   const game = new Phaser.Game({
-    type: Phaser.AUTO,
+    // Explicitly use the Canvas renderer so the game works in environments
+    // without WebGL. Phaser.AUTO fails in headless/limited contexts which
+    // triggers "Must set explicit renderType" errors.
+    type: Phaser.CANVAS,
     width: cfg.VIEW_W,
     height: cfg.VIEW_H,
     canvas: document.getElementById('game'),
