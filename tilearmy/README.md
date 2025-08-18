@@ -43,3 +43,18 @@ MAPSIZE=5 PLENTIFUL=2 CROWD=1 node server.js
 - **Map coordinates** – The cursor panel shows tile coordinates and distance. The server configures the tile size (default 32), so tile `(2,3)` appears at pixel position `(64,96)`.
 
 Happy harvesting!
+
+## Bots
+
+A simple Python script `bot.py` can connect to the server and spawn multiple
+basic bots. Each bot repeatedly requests a scout vehicle which will
+automatically seek out nearby resources.
+
+Install the dependency and run the bots:
+
+```bash
+pip install websockets
+python bot.py ws://localhost:3000/ 3
+```
+
+The example above connects to a local server and starts three bot players.
