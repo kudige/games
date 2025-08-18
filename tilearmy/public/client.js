@@ -346,7 +346,16 @@
       updateCursorInfo();
       updateSpawnControls();
     } else if (msg.type === 'state') {
-      state = msg.state || state;
+      const s = msg.state || {};
+      if (s.players) state.players = s.players;
+      if (s.bases) state.bases = s.bases;
+      if (s.cfg) state.cfg = s.cfg;
+      if (s.resources) {
+        for (const res of s.resources) {
+          const idx = state.resources.findIndex(r => r.id === res.id);
+          if (idx >= 0) state.resources[idx] = res; else state.resources.push(res);
+        }
+      }
       const p = state.players[myId] || {};
       const cur = (p.bases || []).join(',') + '|' +
         (p.vehicles || []).map(v=>v.id+v.state+Math.floor(v.carrying||0)).join(',') + '|' +
