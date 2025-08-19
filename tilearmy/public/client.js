@@ -26,8 +26,6 @@
       this.load.svg('res-stone','/assets/icon-stone-quarry.svg',{width:rs,height:rs});
     }
     create(){
-      this.cameras.main.setBounds(0,0,cfg.MAP_W,cfg.MAP_H);
-      this.add.rectangle(cfg.MAP_W/2,cfg.MAP_H/2,cfg.MAP_W,cfg.MAP_H,0x3a5e2f).setOrigin(0.5);
       this.input.on('pointerdown',p=>handlePointer(p));
       resolveScene(this);
     }
@@ -54,6 +52,13 @@
   const players = {};
   let selectedVehicle = null;
   let myId = null;
+  let bgRect = null;
+
+  function initWorld(){
+    scene.cameras.main.setBounds(0,0,cfg.MAP_W,cfg.MAP_H);
+    if (bgRect) bgRect.destroy();
+    bgRect = scene.add.rectangle(cfg.MAP_W/2,cfg.MAP_H/2,cfg.MAP_W,cfg.MAP_H,0x3a5e2f).setOrigin(0.5);
+  }
 
   const ws = new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'?name='+encodeURIComponent(myName));
   ws.onmessage = ev => {
@@ -61,6 +66,7 @@
     if (msg.type === 'init'){
       myId = msg.id;
       Object.assign(cfg, msg.state.cfg);
+      initWorld();
       Object.assign(players, msg.state.players);
       msg.state.bases.forEach(b=>addBase(b));
       msg.state.resources.forEach(r=>addResource(r));
@@ -68,6 +74,8 @@
         const pl = msg.state.players[pid];
         (pl.vehicles||[]).forEach(v=>addVehicle(pid,v));
       }
+      const myBase = msg.state.bases.find(b=>b.owner===myId);
+      if (myBase) scene.cameras.main.centerOn(myBase.x,myBase.y);
       updatePlayerRes(players[myId]);
       buildVehicleOptions();
     } else if (msg.type === 'update'){
