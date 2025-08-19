@@ -1,0 +1,20 @@
+The TileArmy server advances the game state in a loop that runs every tick (CFG.TICK_MS = 50ms).
+
+1. Compute the duration of the tick in seconds and the amount of energy that players regenerate.
+2. Process any vehicle manufacturing queues for bases.
+3. Determine which resource nodes are currently targeted so multiple vehicles do not claim the same resource.
+4. For each player:
+   - Mark the player offline if they have been disconnected for too long.
+   - For each vehicle:
+     * If the player is offline, recall the vehicle to the nearest base.
+     * If online and the vehicle has capacity, automatically select a nearby unclaimed resource to harvest.
+     * Move the vehicle toward its target and deduct energy based on movement.
+     * When arriving at a base, unload collected resources after a delay.
+     * Harvest from a target resource while within range, filling the vehicle and depleting the node. Full or empty nodes send the vehicle back to base.
+     * Apply damage to enemy bases that are within attack range.
+   - Remove any vehicles that were destroyed and update the player's energy by subtracting spent energy and adding regeneration.
+5. For each base, damage nearby enemy vehicles based on the base's attack stats and remove any vehicles destroyed by this attack.
+6. Resolve base captures by determining ownership based on nearby units.
+7. Create a snapshot of the current state and, at most once per second, broadcast only the entities that have changed since the last snapshot to all connected clients.
+
+This loop keeps the real-time game world progressing and synchronizes updates with connected players.

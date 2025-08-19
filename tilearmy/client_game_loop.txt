@@ -1,0 +1,12 @@
+The TileArmy client renders and predicts game state inside a draw loop driven by requestAnimationFrame.
+
+1. If the browser tab is hidden, reset timing and schedule the next frame without rendering.
+2. Compute the elapsed time and enforce a 30 FPS cap to limit CPU usage.
+3. Clear the canvas and update the camera, either following the selected unit or reacting to keyboard input with friction.
+4. Extrapolate vehicle movement and cargo loading from queued server updates, then smooth positions to avoid jitter.
+5. Run lightweight combat logic to spawn bullet visuals and advance existing projectiles.
+6. Draw the scene in layers: background, grid, resources, bases, vehicles, bullets.
+7. Refresh cursor and UI information.
+8. Request the next animation frame to continue the loop.
+
+This loop keeps the client's display responsive while staying in sync with server state.
