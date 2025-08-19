@@ -142,6 +142,8 @@
   const fireTimers = Object.create(null);
   const bookmarks = [];
   let bookmarkMode = false;
+  const BASE_VISIBILITY = 450;
+  const VEHICLE_VISIBILITY = 250;
   const getBase = id => state.bases.find(b=>b.id===id);
   const findBaseAt = (x, y) => state.bases.find(b => Math.hypot(b.x - x, b.y - y) <= (cfg.BASE_ICON_SIZE/2));
   function findVehicleAt(x, y){
@@ -861,6 +863,35 @@
     ctx.restore();
   }
 
+  function drawFogOfWar(){
+    const me = state.players[myId];
+    if (!me) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'destination-out';
+    const baseRadius = BASE_VISIBILITY * camera.scale;
+    for (const b of state.bases){
+      if (b.owner !== myId) continue;
+      const bx = (b.x - camera.x) * camera.scale;
+      const by = (b.y - camera.y) * camera.scale;
+      ctx.beginPath();
+      ctx.arc(bx, by, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const vehicleRadius = VEHICLE_VISIBILITY * camera.scale;
+    for (const v of me.vehicles){
+      const rv = renderVehicles[v.id] || v;
+      const vx = (rv.x - camera.x) * camera.scale;
+      const vy = (rv.y - camera.y) * camera.scale;
+      ctx.beginPath();
+      ctx.arc(vx, vy, vehicleRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
   function extrapolateVehiclePositions(){
     const now = performance.now();
     for (const pid in state.players){
@@ -1151,6 +1182,7 @@
     drawBases();
     drawVehicles();
     drawBullets();
+    drawFogOfWar();
     updateCursorInfo();
     requestAnimationFrame(draw);
   }
