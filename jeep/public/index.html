@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Isometric Vehicles (Multiplayer)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { height: 100%; margin: 0; background: #0b1220; overflow: hidden; }
+    #game { width:100vw; height:100vh; display:block; cursor:crosshair; }
+    #hud {
+      position: fixed; inset: 12px auto auto 12px; padding: 8px 10px; background: rgba(0,0,0,0.5);
+      color:#fff; border-radius:10px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:13px;
+      display:flex; flex-wrap: wrap; gap: 8px; align-items: center; z-index: 5;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    #status { padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,0.12); }
+    /* Vehicle chooser overlay */
+    #chooser { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); z-index: 10; }
+    #chooser.hidden { display: none; }
+    #chooser .panel {
+      background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.18); border-radius: 14px; padding: 18px;
+      display: grid; gap: 12px; min-width: 380px; max-width: 860px;
+    }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .card { border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 10px; background: rgba(255,255,255,0.06); cursor: pointer; display:grid; gap:6px; }
+    .card:hover, .card:focus { outline: 2px solid rgba(139,233,253,0.7); }
+    .thumb { width: 128px; height: 128px; margin: 0 auto 4px; image-rendering: pixelated; background: rgba(0,0,0,0.2); display: grid; place-items: center; border-radius:8px; }
+    .muted { opacity:.8; font-size:12px; }
+    .nameplate { font: 600 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; text-align:center; color:#fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <span>Server: <span id="status">disconnected</span></span>
+    <span> · Self: <span id="selfLabel">—</span></span>
+  </div>
+
+  <!-- Vehicle chooser overlay -->
+  <div id="chooser" aria-modal="true" role="dialog">
+    <div class="panel">
+      <h3 style="margin:0">Choose your vehicle</h3>
+      <div class="muted" id="vehHint">Loading vehicles…</div>
+      <div class="grid" id="vehicleGrid"></div>
+    </div>
+  </div>
+
+  <script>
+  (()=>{
+    // --- App config ---
+    const TILE_W = 72, TILE_H = 36; // iso footprint
+    const SPRITE = { DIRS: 8, FRAMES: 8, CELL_W: 128, CELL_H: 128, ANCHOR_X: 64, ANCHOR_Y: 92 };
+
+    // Server endpoint: same origin/port
+    const WS_URL = ((location.protocol === 'https:') ? 'wss://' : 'ws://') + location.host;
+
+    // DOM
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const chooser = document.getElementById('chooser');
+    const vehicleGrid = document.getElementById('vehicleGrid');
+    const vehHint = document.getElementById('vehHint');
+    const selfLabel = document.getElementById('selfLabel');
+    const DPR = Math.max(1, Math.min(window.devicePixelRatio||1, 2));
+
+    // State
+    let viewW=0, viewH=0, originX=0, originY=0;
+    let MAP_SIZE = 24; // server will confirm
+
+    let ws=null, reconnectDelay=500, selfId=null, chosenVehicle=null;
+
+    // World data
+    const world = { players: [] };
+
+    // Vehicles fetched from server
+    let VEHICLES = [];
+
+    // Sprite atlas cache per vehicleId
+    const atlasById = new Map(); // id -> Image
+
+    // --- Load vehicles list and build chooser ---
+    (async function loadVehicles(){
+      try{
+        const res = await fetch('/vehicles.json', { cache: 'no-store' });
+        const data = await res.json();
+        VEHICLES = data.vehicles || [];
+        buildChooser(VEHICLES);
+      }catch(e){ vehHint.textContent = 'Failed to load vehicles'; console.error(e); }
+    })();
+
+    function buildChooser(list){
+      vehHint.textContent = 'Click a vehicle to spawn';
+      vehicleGrid.innerHTML = '';
+      const urlVeh = new URLSearchParams(location.search).get('vehicle');
+      list.forEach(v => {
+        const card = document.createElement('button');
+        card.type='button'; card.className='card'; card.dataset.vehicle=v.id; card.setAttribute('aria-label', v.name||`Vehicle ${v.id}`);
+        const t = document.createElement('div'); t.className='thumb'; t.textContent = '…';
+        const img = new Image(); img.onload = ()=>{ const c=document.createElement('canvas'); c.width=128; c.height=128; const g=c.getContext('2d'); g.imageSmoothingEnabled=false; const sx=(SPRITE.FRAMES>>1)*SPRITE.CELL_W; const sy=0; g.drawImage(img, sx,sy,SPRITE.CELL_W,SPRITE.CELL_H, 0,0,128,128); t.textContent=''; t.appendChild(c); }; img.src = v.sprite;
+        const name = document.createElement('div'); name.textContent = v.name || `Vehicle ${v.id}`;
+        const meta = document.createElement('div'); meta.className='muted'; meta.textContent = `ID ${v.id} · max ${v.speed ?? '—'} wu/s · HP ${v.hp ?? '—'}`;
+        card.appendChild(t); card.appendChild(name); card.appendChild(meta); vehicleGrid.appendChild(card);
+        card.addEventListener('click', ()=> startWithVehicle(v.id));
+        // Preload atlas in background
+        getAtlasForVehicleId(v.id);
+        // Auto-select via ?vehicle=ID
+        if (urlVeh !== null && Number(urlVeh) === v.id){ startWithVehicle(v.id); }
+      });
+    }
+
+    function startWithVehicle(id){
+      if (chosenVehicle !== null) return; // prevent double
+      chosenVehicle = id;
+      hideChooser();
+      connect();
+    }
+
+    function hideChooser(){ chooser.classList.add('hidden'); }
+    function showChooser(){ chooser.classList.remove('hidden'); }
+
+    // --- World <-> Screen (isometric) ---
+    function worldToScreen(x, y) { return { x: (x - y) * (TILE_W/2) + originX, y: (x + y) * (TILE_H/2) + originY }; }
+    function screenToWorld(sx, sy) { const dx=sx-originX, dy=sy-originY; return { x:(dx/TILE_W)+(dy/TILE_H), y:(dy/TILE_H)-(dx/TILE_W) }; }
+
+    // --- Map background (simple grid) ---
+    let mapCanvas=null;
+    function buildMapCanvas(){
+      const mapW = MAP_SIZE * TILE_W, mapH = MAP_SIZE * TILE_H;
+      const mc=document.createElement('canvas'); mc.width=mapW*DPR; mc.height=mapH*DPR; const g=mc.getContext('2d'); g.scale(DPR,DPR);
+      g.fillStyle = '#2b8a3e'; g.fillRect(0,0,mapW,mapH);
+      g.strokeStyle = 'rgba(0,0,0,0.12)';
+      for(let y=0;y<=MAP_SIZE;y++){
+        const a={x:(0-y)*(TILE_W/2)+mapW/2,y:(0+y)*(TILE_H/2)}; const b={x:((MAP_SIZE)-y)*(TILE_W/2)+mapW/2, y:((MAP_SIZE)+y)*(TILE_H/2)};
+        g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
+      }
+      for(let x=0;x<=MAP_SIZE;x++){
+        const a={x:(x-0)*(TILE_W/2)+mapW/2,y:(x+0)*(TILE_H/2)}; const b={x:(x-MAP_SIZE)*(TILE_W/2)+mapW/2,y:(x+MAP_SIZE)*(TILE_H/2)};
+        g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
+      }
+      return mc;
+    }
+
+    // --- Resize ---
+    function resize(){
+      viewW=Math.floor(window.innerWidth); viewH=Math.floor(window.innerHeight);
+      canvas.style.width=viewW+'px'; canvas.style.height=viewH+'px'; canvas.width=Math.floor(viewW*DPR); canvas.height=Math.floor(viewH*DPR); ctx.setTransform(DPR,0,0,DPR,0,0);
+      originX = viewW/2; originY = (viewH - MAP_SIZE*TILE_H)/2;
+      mapCanvas = buildMapCanvas();
+    }
+    window.addEventListener('resize', resize);
+
+    // --- Input: clicks control own vehicle ---
+    canvas.addEventListener('pointerdown', (evt)=>{
+      if (chooser && !chooser.classList.contains('hidden')) return; // overlay up: ignore
+      if (!ws || ws.readyState!==1) return; if (!selfId) return;
+      const rect = canvas.getBoundingClientRect();
+      const sx = (evt.clientX - rect.left), sy = (evt.clientY - rect.top);
+      const w = screenToWorld(sx, sy);
+      send({ type: 'click', x: clamp(w.x,0,MAP_SIZE), y: clamp(w.y,0,MAP_SIZE) });
+    });
+
+    // --- Networking ---
+    function connect(){
+      setStatus('connecting…');
+      ws = new WebSocket(WS_URL);
+      ws.onopen = ()=>{ setStatus('connected'); send({ type:'hello' }); if (chosenVehicle!=null) send({ type:'choose', vehicleId: chosenVehicle }); };
+      ws.onclose = ()=>{ setStatus('disconnected'); setTimeout(()=>{ if (chosenVehicle!=null) connect(); else showChooser(); }, reconnectDelay); reconnectDelay = Math.min(5000, reconnectDelay*1.7); };
+      ws.onerror = ()=>{};
+      ws.onmessage = (ev)=>{
+        let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+        if (msg.type==='welcome'){
+          selfId = msg.selfId; MAP_SIZE = msg.mapSize ?? MAP_SIZE; selfLabel.textContent = `${selfId} (veh ${chosenVehicle ?? '—'})`; resize();
+          // Ensure chooser is hidden once welcome arrives
+          hideChooser();
+        } else if (msg.type==='world'){
+          world.players = msg.players || [];
+          if (typeof msg.mapSize==='number' && msg.mapSize!==MAP_SIZE){ MAP_SIZE=msg.mapSize; resize(); }
+        }
+      };
+    }
+
+    function send(o){ try{ ws && ws.readyState===1 && ws.send(JSON.stringify(o)); }catch(e){} }
+    function setStatus(s){ if (statusEl) statusEl.textContent = s; }
+
+    // --- Rendering ---
+    function headingToDirIndex(rad){ const step=Math.PI/4; let a=rad%(Math.PI*2); if(a<0)a+=Math.PI*2; return (Math.round(a/step)) & 7; }
+
+    function getAtlasForVehicleId(id){
+      if (atlasById.has(id)) return atlasById.get(id);
+      const meta = VEHICLES.find(v => v.id === id);
+      const src = meta ? meta.sprite : `vehicle_sprite[${id}].png`;
+      const img = new Image(); img.crossOrigin='anonymous'; img.src = src; atlasById.set(id, img); return img;
+    }
+
+    function drawNameplateAndHP(p, base){
+      // Callsign above
+      const label = p.callsign || `P${p.id}`;
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '600 12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(base.x-40, base.y-74, 80, 32);
+      ctx.fillStyle = '#fff'; ctx.fillText(label, base.x, base.y-56);
+      // HP bar
+      const hpMax = p.hpMax || 100; const hp = Math.max(0, Math.min(hpMax, p.hp ?? hpMax));
+      const w = 64; const h = 6; const x = base.x - w/2; const y = base.y - 52;
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#24d05a'; ctx.fillRect(x, y, (hp/hpMax)*w, h);
+      ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+      ctx.restore();
+    }
+
+    function render(){
+      ctx.clearRect(0,0,viewW,viewH);
+      const mapW=MAP_SIZE*TILE_W, mapH=MAP_SIZE*TILE_H; ctx.drawImage(mapCanvas, originX-mapW/2, originY, mapW, mapH);
+
+      for (const p of world.players){
+        const base = worldToScreen(p.x, p.y);
+        const dir = headingToDirIndex(p.heading||0);
+        const angle = (performance.now()/1000) * (p.speed||0) / 0.18; // visual wheel spin
+        const frame = Math.floor(((angle % (Math.PI*2)) / (Math.PI*2)) * SPRITE.FRAMES) >>> 0;
+        const atlas = getAtlasForVehicleId(p.vehicleId ?? 0);
+        const sx = frame * SPRITE.CELL_W, sy = dir * SPRITE.CELL_H;
+        ctx.drawImage(atlas, sx, sy, SPRITE.CELL_W, SPRITE.CELL_H, Math.round(base.x - SPRITE.ANCHOR_X), Math.round(base.y - SPRITE.ANCHOR_Y), SPRITE.CELL_W, SPRITE.CELL_H);
+        if (p.id === selfId){ ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(base.x, base.y-60, 10, 0, Math.PI*2); ctx.stroke(); }
+        if (p.callsign || p.hp!==undefined) drawNameplateAndHP(p, base);
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    // --- Helpers ---
+    function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+    // Boot
+    resize();
+    requestAnimationFrame(render);
+  })();
+  </script>
+</body>
+</html>
