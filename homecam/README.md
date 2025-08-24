@@ -53,9 +53,21 @@ curl http://localhost:8000/cameras
 curl -X DELETE http://localhost:8000/cameras/front
 ```
 
+### Live streams
+After adding a camera, low- and high-quality HLS playlists are available:
+
+- `http://localhost:8000/streams/<camera_id>/low/index.m3u8`
+- `http://localhost:8000/streams/<camera_id>/high/index.m3u8`
+
+Use a player such as [hls.js](https://github.com/video-dev/hls.js/) in the frontend to view these streams.
+
 ## Manual testing
 1. **Verify recording** – After adding a camera, check that the configured `storage_path` contains timestamped `.mp4` files created by `ffmpeg`.
-2. **Verify retention** – Run the cleanup utility to remove recordings older than the retention period:
+2. **Verify live streams** – Fetch the HLS playlist for a camera:
+   ```bash
+   curl http://localhost:8000/streams/front/low/index.m3u8
+   ```
+3. **Verify retention** – Run the cleanup utility to remove recordings older than the retention period:
    ```bash
    python - <<'PY'
 from pathlib import Path
@@ -63,7 +75,7 @@ from homecam.backend.retention import cleanup_old_recordings
 cleanup_old_recordings(Path('./recordings/front'), retention_days=7)
 PY
    ```
-3. **Run unit tests** – Execute the pytest suite:
+4. **Run unit tests** – Execute the pytest suite:
    ```bash
    python -m pytest -q
    ```

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 from .recorder import Recorder
 
@@ -17,6 +17,20 @@ class CameraConfig:
     rtsp_url: str
     storage_path: Path
     retention_days: int
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize config including stream URLs."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "rtsp_url": self.rtsp_url,
+            "storage_path": str(self.storage_path),
+            "retention_days": self.retention_days,
+            "stream_urls": {
+                "low": f"/streams/{self.id}/low/index.m3u8",
+                "high": f"/streams/{self.id}/high/index.m3u8",
+            },
+        }
 
 
 class CameraManager:
