@@ -61,6 +61,10 @@ After adding a camera, low- and high-quality HLS playlists are available:
 
 Use a player such as [hls.js](https://github.com/video-dev/hls.js/) in the frontend to view these streams.
 
+The playlist files are created immediately, but it may take a few seconds after adding a
+camera for `ffmpeg` to begin writing segments. If the playlist contains only `#EXTM3U`,
+wait briefly and try again to allow the stream to start.
+
 ## Manual testing
 1. **Verify recording** – After adding a camera, check that the configured `storage_path` contains timestamped `.mp4` files created by `ffmpeg`.
 2. **Verify live streams** – Fetch the HLS playlist for a camera:

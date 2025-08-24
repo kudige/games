@@ -21,6 +21,8 @@ def test_ffmpeg_command_has_hls_outputs(tmp_path: Path):
         tmp_path / "streams/low/index.m3u8",
         tmp_path / "streams/high/index.m3u8",
     )
+    assert "-rtsp_transport" in cmd
+    assert "tcp" in cmd
     assert str(tmp_path / "out.mp4") in cmd
     assert str(tmp_path / "streams/low/index.m3u8") in cmd
     assert str(tmp_path / "streams/high/index.m3u8") in cmd

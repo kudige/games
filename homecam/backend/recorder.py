@@ -21,6 +21,8 @@ class Recorder:
         return [
             "ffmpeg",
             "-y",
+            "-rtsp_transport",
+            "tcp",
             "-i",
             self.camera.rtsp_url,
             # Full-quality recording
@@ -67,12 +69,19 @@ class Recorder:
         high_dir = record_dir / "streams" / "high"
         for d in (record_dir, low_dir, high_dir):
             d.mkdir(parents=True, exist_ok=True)
+
+        # Create placeholder playlists so the API doesn't 404 before ffmpeg writes them
+        for playlist in (low_dir / "index.m3u8", high_dir / "index.m3u8"):
+            playlist.write_text("#EXTM3U\n")
+
         filename = datetime.utcnow().strftime("%Y%m%d_%H%M%S.mp4")
         record_path = record_dir / filename
         cmd = self._build_ffmpeg_cmd(
             record_path, low_dir / "index.m3u8", high_dir / "index.m3u8"
         )
-        self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
 
     def stop(self) -> None:
         if self.process and self.process.poll() is None:
