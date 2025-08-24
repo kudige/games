@@ -30,6 +30,9 @@
         label.textContent = cam.name;
         const video = document.createElement('video');
         video.controls = true;
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
         div.appendChild(label);
         div.appendChild(video);
         grid.appendChild(div);
@@ -38,8 +41,12 @@
           const hls = new Hls();
           hls.loadSource(url);
           hls.attachMedia(video);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play();
+          });
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
           video.src = url;
+          video.addEventListener('loadedmetadata', () => video.play());
         }
       });
     }
