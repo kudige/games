@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>HomeCam Grid</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    header { padding: 10px; background: #222; color: white; }
+    #grid { display: flex; flex-wrap: wrap; }
+    .cam { width: 33%; box-sizing: border-box; padding: 5px; }
+    video { width: 100%; background: black; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Camera Grid</h1>
+    <a href="/manage" style="color: #9cf">Manage Cameras</a>
+  </header>
+  <div id="grid"></div>
+  <script>
+    async function load() {
+      const res = await fetch('/cameras');
+      const cams = await res.json();
+      const grid = document.getElementById('grid');
+      cams.forEach(cam => {
+        const div = document.createElement('div');
+        div.className = 'cam';
+        const label = document.createElement('div');
+        label.textContent = cam.name;
+        const video = document.createElement('video');
+        video.controls = true;
+        div.appendChild(label);
+        div.appendChild(video);
+        grid.appendChild(div);
+        const url = cam.stream_urls.low;
+        if (Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(url);
+          hls.attachMedia(video);
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = url;
+        }
+      });
+    }
+    load();
+  </script>
+</body>
+</html>

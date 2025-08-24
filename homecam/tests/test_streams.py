@@ -1,4 +1,7 @@
 from pathlib import Path
+import os
+
+os.environ["HOMECAM_TESTING"] = "1"
 
 from fastapi.testclient import TestClient
 

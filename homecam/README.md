@@ -40,10 +40,10 @@ curl -X POST http://localhost:8000/cameras \
         "id": "front",
         "name": "Front Door",
         "rtsp_url": "rtsp://example/stream",
-        "storage_path": "./recordings/front",
         "retention_days": 7
       }'
 ```
+The `storage_path` field is optional. If omitted, recordings default to `./recordings/<id>`.
 
 ### List cameras
 ```bash
@@ -66,6 +66,14 @@ Use a player such as [hls.js](https://github.com/video-dev/hls.js/) in the front
 The playlist files are created immediately, but it may take a few seconds after adding a
 camera for `ffmpeg` to begin writing segments. If the playlist contains only `#EXTM3U`,
 wait briefly and try again to allow the stream to start.
+
+## Frontend
+
+A minimal frontend is served by the FastAPI app:
+
+- `http://localhost:8000/` shows a grid of low-bandwidth streams for all cameras.
+- `http://localhost:8000/manage` provides a form to add or edit cameras. Leave the
+  storage path blank to use the default directory under `./recordings`.
 
 ## Manual testing
 1. **Verify recording** – After adding a camera, check that the configured `storage_path` contains timestamped `.mp4` files created by `ffmpeg`.

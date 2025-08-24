@@ -24,10 +24,11 @@ Phases
    - Implement cleanup job that removes files older than configured retention period.
    - Allow global default settings overridden per camera.
 
-4. **Live View** *(implemented)*
+4. **Live View** *(in progress)*
    - Backend generates low-bandwidth preview streams (e.g., using HLS with reduced resolution/bitrate).
    - Use the per-camera `ffmpeg` process to also produce a high-resolution stream while recording, mapping outputs for low and high quality feeds.
    - Frontend dashboard displays cameras in a grid with these preview streams.
+   - Camera management page allows adding and editing cameras with an optional storage path override.
    - Enable user to select a camera for high‑resolution stream (full HLS/WebRTC feed).
 
 5. **Recorded Video Playback**
@@ -52,6 +53,6 @@ Milestones
 ---------
 - M1: Basic RTSP ingestion and file storage. (implemented)
 - M2: Configurable retention and management API. (implemented)
-- M3: Live low-bandwidth grid view & high-res view. (implemented)
+- M3: Live low-bandwidth grid view & high-res view. (in progress)
 - M4: Recorded playback UI.
 - M5: Motion detection prototype.
