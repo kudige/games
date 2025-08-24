@@ -22,6 +22,13 @@ uvicorn homecam.backend.main:app --reload
 
 The API will be available at http://localhost:8000.
 
+To run on a different port, provide the `--port` option. For example, to listen on port
+`9000`:
+
+```bash
+uvicorn homecam.backend.main:app --reload --port 9000
+```
+
 ## Example usage
 ### Add a camera
 ```bash
