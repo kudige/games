@@ -1,0 +1,57 @@
+Home Camera Surveillance System Roadmap
+======================================
+
+Overview
+--------
+This document outlines the steps to develop a home camera surveillance system with a JavaScript/Python backend and web-based frontend. The system will support adding RTSP streams, configurable video storage, retention policies, live viewing, recorded playback, and future motion detection.
+
+Phases
+------
+
+1. **Project Setup**
+   - Initialize repository structure for backend (Python services + Node.js REST API) and frontend.
+   - Choose frontend technology. Beyond React, lightweight alternatives include Preact, Svelte, or vanilla JS libraries like HTMX, which have fewer dependencies.
+   - Define configuration files for storing system settings (YAML/JSON).
+
+2. **RTSP Stream Management**
+   - Implement API endpoints to register, update, and remove camera streams. Each camera includes RTSP URL, name, and storage settings.
+   - Create Python service using `ffmpeg`/`gstreamer` to ingest RTSP streams and write video segments.
+   - Employ a single `ffmpeg` process per camera with filter graphs to simultaneously record to disk and generate multiple outputs.
+   - Support per-camera configuration for output directory and retention duration.
+
+3. **Video Storage & Retention**
+   - Standardize directory structure: `/storage/<camera_id>/<date>/<time>.mp4`.
+   - Implement cleanup job that removes files older than configured retention period.
+   - Allow global default settings overridden per camera.
+
+4. **Live View**
+   - Backend generates low-bandwidth preview streams (e.g., using HLS with reduced resolution/bitrate).
+   - Use the per-camera `ffmpeg` process to also produce a high-resolution stream while recording, mapping outputs for low and high quality feeds.
+   - Frontend dashboard displays cameras in a grid with these preview streams.
+   - Enable user to select a camera for high‑resolution stream (full HLS/WebRTC feed).
+
+5. **Recorded Video Playback**
+   - API to list recordings by camera and date/time.
+   - Frontend browser to navigate by camera -> date -> time and play selected recording.
+
+6. **Authentication & Permissions**
+   - Integrate user management and auth (JWT or session-based).
+   - Restrict camera viewing and configuration to authorized users.
+
+7. **Future: Motion Detection**
+   - Add Python service using OpenCV or similar to analyze video frames for motion.
+   - Trigger events/logging and mark recordings with motion timestamps.
+   - Optional notifications via webhooks or mobile push.
+
+8. **Deployment & Configuration**
+   - Containerize services with Docker.
+   - Provide configuration for storage paths, retention, and camera definitions via environment variables or config files.
+   - Document setup and provide scripts for installing dependencies and starting services.
+
+Milestones
+---------
+- M1: Basic RTSP ingestion and file storage. (implemented)
+- M2: Configurable retention and management API. (implemented)
+- M3: Live low-bandwidth grid view & high-res view.
+- M4: Recorded playback UI.
+- M5: Motion detection prototype.
