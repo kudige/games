@@ -42,6 +42,10 @@ class CameraManager:
         self.recorders: Dict[str, Recorder] = {}
         if self.config_file.exists():
             self._load()
+            for cam in self.cameras.values():
+                rec = Recorder(cam)
+                rec.start()
+                self.recorders[cam.id] = rec
 
     # ------------------------------------------------------------------
     # Configuration persistence

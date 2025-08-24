@@ -21,6 +21,8 @@ uvicorn homecam.backend.main:app --reload
 ```
 
 The API will be available at http://localhost:8000.
+Existing camera configurations in `camera_config.json` are automatically
+resumed and begin recording when the server starts.
 
 To run on a different port, provide the `--port` option. For example, to listen on port
 `9000`:
