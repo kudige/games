@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Manage Cameras</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    form div { margin-bottom: 8px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Manage Cameras</h1>
+  <form id="cameraForm">
+    <div><label>ID <input type="text" id="id" required></label></div>
+    <div><label>Name <input type="text" id="name" required></label></div>
+    <div><label>RTSP URL <input type="text" id="rtsp_url" required></label></div>
+    <div><label>Storage Path <input type="text" id="storage_path"></label></div>
+    <div><label>Retention Days <input type="number" id="retention_days" value="7" required></label></div>
+    <button type="submit">Save</button>
+  </form>
+
+  <table id="cameraTable">
+    <thead><tr><th>ID</th><th>Name</th><th>Storage</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let defaultStorage = '';
+    async function loadDefaults() {
+      const res = await fetch('/defaults');
+      const data = await res.json();
+      defaultStorage = data.storage_path;
+      document.getElementById('storage_path').placeholder = defaultStorage + '/{id}';
+    }
+
+    async function loadCameras() {
+      const res = await fetch('/cameras');
+      const cams = await res.json();
+      const tbody = document.querySelector('#cameraTable tbody');
+      tbody.innerHTML = '';
+      cams.forEach(cam => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${cam.id}</td><td>${cam.name}</td><td>${cam.storage_path}</td><td><button data-id="${cam.id}">Edit</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.querySelector('#cameraTable').addEventListener('click', e => {
+      if (e.target.tagName === 'BUTTON') {
+        const id = e.target.getAttribute('data-id');
+        fetch('/cameras').then(r => r.json()).then(cams => {
+          const cam = cams.find(c => c.id === id);
+          if (cam) {
+            document.getElementById('id').value = cam.id;
+            document.getElementById('name').value = cam.name;
+            document.getElementById('rtsp_url').value = cam.rtsp_url;
+            document.getElementById('storage_path').value = cam.storage_path;
+            document.getElementById('retention_days').value = cam.retention_days;
+          }
+        });
+      }
+    });
+
+    document.getElementById('cameraForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const payload = {
+        id: document.getElementById('id').value,
+        name: document.getElementById('name').value,
+        rtsp_url: document.getElementById('rtsp_url').value,
+        storage_path: document.getElementById('storage_path').value.trim() || null,
+        retention_days: parseInt(document.getElementById('retention_days').value, 10)
+      };
+      await fetch('/cameras', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      loadCameras();
+    });
+
+    loadDefaults();
+    loadCameras();
+  </script>
+</body>
+</html>

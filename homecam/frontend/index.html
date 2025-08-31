@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>HomeCam Grid</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    header { padding: 10px; background: #222; color: white; }
+    #grid { display: flex; flex-wrap: wrap; }
+    .cam { width: 33%; box-sizing: border-box; padding: 5px; }
+    video { width: 100%; background: black; }
+    #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; }
+    #overlay video { width: 80%; max-width: 960px; }
+    #overlay button { position: absolute; top: 10px; right: 20px; font-size: 24px; background: transparent; color: white; border: none; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Camera Grid</h1>
+    <a href="/manage" style="color: #9cf">Manage Cameras</a>
+  </header>
+  <div id="grid"></div>
+  <div id="overlay">
+    <button id="close">&times;</button>
+    <video id="highres" controls autoplay></video>
+  </div>
+  <script>
+    let overlayHls;
+    function showHighRes(url) {
+      document.querySelectorAll('#grid video').forEach(v => v.pause());
+      const overlay = document.getElementById('overlay');
+      const hv = document.getElementById('highres');
+      overlay.style.display = 'flex';
+      if (overlayHls) {
+        overlayHls.destroy();
+        overlayHls = null;
+      }
+      if (Hls.isSupported()) {
+        overlayHls = new Hls();
+        overlayHls.loadSource(url);
+        overlayHls.attachMedia(hv);
+        overlayHls.on(Hls.Events.MANIFEST_PARSED, () => hv.play());
+      } else if (hv.canPlayType('application/vnd.apple.mpegurl')) {
+        hv.src = url;
+        hv.addEventListener('loadedmetadata', () => hv.play(), { once: true });
+      }
+    }
+    function closeOverlay() {
+      const overlay = document.getElementById('overlay');
+      const hv = document.getElementById('highres');
+      overlay.style.display = 'none';
+      if (overlayHls) {
+        overlayHls.destroy();
+        overlayHls = null;
+      }
+      hv.pause();
+      hv.removeAttribute('src');
+      document.querySelectorAll('#grid video').forEach(v => v.play());
+    }
+    document.getElementById('close').addEventListener('click', closeOverlay);
+    document.getElementById('overlay').addEventListener('click', e => { if (e.target.id === 'overlay') closeOverlay(); });
+    async function load() {
+      const res = await fetch('/cameras');
+      const cams = await res.json();
+      const grid = document.getElementById('grid');
+      cams.forEach(cam => {
+        const div = document.createElement('div');
+        div.className = 'cam';
+        const label = document.createElement('div');
+        label.textContent = cam.name;
+        const video = document.createElement('video');
+        video.controls = true;
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.addEventListener('click', () => showHighRes(cam.stream_urls.high));
+        div.appendChild(label);
+        div.appendChild(video);
+        grid.appendChild(div);
+        const url = cam.stream_urls.low;
+        if (Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(url);
+          hls.attachMedia(video);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play();
+          });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = url;
+          video.addEventListener('loadedmetadata', () => video.play());
+        }
+      });
+    }
+    load();
+  </script>
+</body>
+</html>
